@@ -16,7 +16,10 @@ type address struct {
 
 func (a address) String() string {
 	if a.IP != nil {
-		return fmt.Sprintf("%s:%s", a.IP, a.Port)
+		host := a.IP.String()
+		port := a.Port.String()
+
+		return net.JoinHostPort(host, port)
 	}
 
 	return fmt.Sprintf("%s:%s", a.Domain, a.Port)

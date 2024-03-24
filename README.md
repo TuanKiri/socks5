@@ -1,5 +1,8 @@
 # Go SOCKS 5 proxy
 
+[![license](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
+[![go version](https://img.shields.io/github/go-mod/go-version/JC5LZiy3HVfV5ux/socks5)](go.mod)
+
 Golang package for implementing a socks 5 proxy server.
 
 ## Installation
@@ -20,11 +23,15 @@ import (
 )
 
 func main() {
+	// Options allowed as nil. Example options: 
+	// &socks5.Options{
+	//     ListenAddr: 127.0.0.1:5000,
+    // }
 	srv := socks5.New(nil)
 
-	// Addr: 127.0.0.1:1080
+	// Default addr: 127.0.0.1:1080
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal(err)
+	    log.Fatal(err)
 	}
 }
 ```

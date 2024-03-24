@@ -61,23 +61,11 @@ func (s *Server) usernamePasswordAuthenticate(writer io.Writer, reader *bufio.Re
 	}
 
 	if string(password) != passwordFromStore {
-		if err := response(writer,
-			usernamePasswordVersion,
-			usernamePasswordFailure,
-		); err != nil {
-			s.logger.LogErrorMessage(err, "failed to send a response to the client")
-		}
-
+		s.response(writer, usernamePasswordVersion, usernamePasswordFailure)
 		return
 	}
 
-	if err := response(writer,
-		usernamePasswordVersion,
-		usernamePasswordSuccess,
-	); err != nil {
-		s.logger.LogErrorMessage(err, "failed to send a response to the client")
-		return
-	}
+	s.response(writer, usernamePasswordVersion, usernamePasswordSuccess)
 
 	s.acceptRequest(writer, reader)
 }

@@ -35,7 +35,7 @@ func TestProxyConnect(t *testing.T) {
 			Wait:           []byte("pong!"),
 		},
 		"FQDN_address": {
-			RemoteServerAddr: "127.0.0.1:9452",
+			RemoteServerAddr: "localhost:9452",
 			ProxyAddr:        "127.0.0.1:1152",
 			ProxyOpts: &socks5.Options{
 				ListenAddr: "127.0.0.1:1152",
@@ -58,8 +58,7 @@ func TestProxyConnect(t *testing.T) {
 			Wait: []byte("pong!"),
 		},
 		"wrong_authenticate_by_username_password": {
-			RemoteServerAddr: "127.0.0.1:9454",
-			ProxyAddr:        "127.0.0.1:1154",
+			ProxyAddr: "127.0.0.1:1154",
 			ProxyOpts: &socks5.Options{
 				StaticCredentials: map[string]string{
 					"root": "password123",
@@ -67,12 +66,12 @@ func TestProxyConnect(t *testing.T) {
 				UserPassAuth: true,
 				ListenAddr:   "127.0.0.1:1154",
 			},
-			DestinationUrl: "http://localhost:9454/ping",
+			DestinationUrl: "http://localhost:9454",
 			ClientCredentials: &proxy.Auth{
 				User:     "root",
 				Password: "password",
 			},
-			Error: "Get \"http://localhost:9454/ping\": socks connect " +
+			Error: "Get \"http://localhost:9454\": socks connect " +
 				"tcp 127.0.0.1:1154->localhost:9454: username/password authentication failed",
 		},
 		"over_tls": {
@@ -89,6 +88,35 @@ func TestProxyConnect(t *testing.T) {
 				Password: "password",
 			},
 			Wait: []byte("pong!"),
+		},
+		"connection_refused": {
+			ProxyAddr: "127.0.0.1:1156",
+			ProxyOpts: &socks5.Options{
+				Logger:     &socks5.NoOutputLogger{},
+				ListenAddr: "127.0.0.1:1156",
+			},
+			DestinationUrl: "http://localhost:4000",
+			Error: "Get \"http://localhost:4000\": socks connect " +
+				"tcp 127.0.0.1:1156->localhost:4000: unknown error connection refused",
+		},
+		"IPv6_address": {
+			RemoteServerAddr: "[::1]:9457",
+			ProxyAddr:        "127.0.0.1:1157",
+			ProxyOpts: &socks5.Options{
+				ListenAddr: "127.0.0.1:1157",
+			},
+			DestinationUrl: "http://[::1]:9457/ping",
+			Wait:           []byte("pong!"),
+		},
+		"host_unreachable": {
+			ProxyAddr: "127.0.0.1:1158",
+			ProxyOpts: &socks5.Options{
+				Logger:     &socks5.NoOutputLogger{},
+				ListenAddr: "127.0.0.1:1158",
+			},
+			DestinationUrl: "http://no_such_host.test",
+			Error: "Get \"http://no_such_host.test\": socks connect " +
+				"tcp 127.0.0.1:1158->no_such_host.test:80: unknown error host unreachable",
 		},
 	}
 

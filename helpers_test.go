@@ -59,6 +59,10 @@ func (d testTLSDriver) Dial(addr string) (net.Conn, error) {
 }
 
 func runRemoteServer(addr string, useTLS bool) {
+	if addr == "" {
+		return
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
