@@ -1,8 +1,8 @@
 <div align="center">
 
-<img alt="Daytona logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200" height="200">
+<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200" height="200">
 
-<h1>Go SOCKS 5 proxy</h1>
+<h1>SOCKS 5 proxy</h1>
 
 [![license](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
 [![go version](https://img.shields.io/github/go-mod/go-version/JC5LZiy3HVfV5ux/socks5)](go.mod)
