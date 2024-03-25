@@ -1,9 +1,14 @@
-# Go SOCKS 5 proxy
+<div align="center">
+
+<img alt="Daytona logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200" height="200">
+
+<h1>Go SOCKS 5 proxy</h1>
 
 [![license](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
 [![go version](https://img.shields.io/github/go-mod/go-version/JC5LZiy3HVfV5ux/socks5)](go.mod)
 
 Golang package for implementing a socks 5 proxy server.
+</div>
 
 ## Installation
 
@@ -25,7 +30,7 @@ import (
 func main() {
 	// Options allowed as nil. Example options: 
 	// &socks5.Options{
-	//     ListenAddr: 127.0.0.1:5000,
+	//     ListenAddr: "127.0.0.1:5000",
 	// }
 	srv := socks5.New(nil)
 
@@ -54,3 +59,7 @@ See the [tests](socks5_test.go) for more information about package.
 ## Licenses
 
 All source code is licensed under the [MIT License](LICENSE).
+
+## Credits
+
+Original gophers design by [@Egon Elbre](https://github.com/egonelbre/gophers).
