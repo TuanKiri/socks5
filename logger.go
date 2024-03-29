@@ -1,20 +1,50 @@
 package socks5
 
-import "log"
+import (
+	"context"
+	"fmt"
+	"log"
+)
 
 type Logger interface {
-	LogErrorMessage(err error, message string)
+	Info(ctx context.Context, msg string, args ...any)
+	Warn(ctx context.Context, msg string, args ...any)
+	Error(ctx context.Context, msg string, args ...any)
 }
 
 type stdoutLogger struct {
-	errorLogger *log.Logger
+	log *log.Logger
 }
 
-func (l *stdoutLogger) LogErrorMessage(err error, message string) {
-	l.errorLogger.Printf("level: ERROR message: %s error: %s", message, err)
+func (l *stdoutLogger) Info(ctx context.Context, msg string, args ...any) {
+	l.print(ctx, "INFO", msg, args...)
 }
+
+func (l *stdoutLogger) Warn(ctx context.Context, msg string, args ...any) {
+	l.print(ctx, "WARN", msg, args...)
+}
+
+func (l *stdoutLogger) Error(ctx context.Context, msg string, args ...any) {
+	l.print(ctx, "ERROR", msg, args...)
+}
+
+func (l *stdoutLogger) print(ctx context.Context, level, msg string, args ...any) {
+	output := fmt.Sprintf("- %s - %s %s", level, msg, fmt.Sprintln(args...))
+
+	if remoteAddress, ok := RemoteAddressFromContext(ctx); ok {
+		addressColumn := "- " + remoteAddress
+
+		output = fmt.Sprintf("%s %s", addressColumn, output)
+	}
+
+	l.log.Print(output)
+}
+
+type nopLogger struct{}
+
+func (l *nopLogger) Info(_ context.Context, _ string, _ ...any)  {}
+func (l *nopLogger) Warn(_ context.Context, _ string, _ ...any)  {}
+func (l *nopLogger) Error(_ context.Context, _ string, _ ...any) {}
 
 // Silent logger, produces no output
-type NoOutputLogger struct{}
-
-func (l *NoOutputLogger) LogErrorMessage(err error, message string) {}
+var NopLogger *nopLogger

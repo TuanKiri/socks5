@@ -29,6 +29,7 @@ func TestProxyConnect(t *testing.T) {
 			RemoteServerAddr: "127.0.0.1:9451",
 			ProxyAddr:        "127.0.0.1:1151",
 			ProxyOpts: &socks5.Options{
+				Logger:     socks5.NopLogger,
 				ListenAddr: "127.0.0.1:1151",
 			},
 			DestinationUrl: "http://127.0.0.1:9451/ping",
@@ -38,6 +39,7 @@ func TestProxyConnect(t *testing.T) {
 			RemoteServerAddr: "localhost:9452",
 			ProxyAddr:        "127.0.0.1:1152",
 			ProxyOpts: &socks5.Options{
+				Logger:     socks5.NopLogger,
 				ListenAddr: "127.0.0.1:1152",
 			},
 			DestinationUrl: "http://localhost:9452/ping",
@@ -47,6 +49,7 @@ func TestProxyConnect(t *testing.T) {
 			RemoteServerAddr: "127.0.0.1:9453",
 			ProxyAddr:        "127.0.0.1:1153",
 			ProxyOpts: &socks5.Options{
+				Logger:       socks5.NopLogger,
 				UserPassAuth: true,
 				ListenAddr:   "127.0.0.1:1153",
 			},
@@ -60,6 +63,7 @@ func TestProxyConnect(t *testing.T) {
 		"wrong_authenticate_by_username_password": {
 			ProxyAddr: "127.0.0.1:1154",
 			ProxyOpts: &socks5.Options{
+				Logger: socks5.NopLogger,
 				StaticCredentials: map[string]string{
 					"root": "password123",
 				},
@@ -78,6 +82,7 @@ func TestProxyConnect(t *testing.T) {
 			RemoteServerAddr: "127.0.0.1:9455",
 			ProxyAddr:        "127.0.0.1:1155",
 			ProxyOpts: &socks5.Options{
+				Logger:       socks5.NopLogger,
 				UserPassAuth: true,
 				ListenAddr:   "127.0.0.1:1155",
 			},
@@ -92,7 +97,7 @@ func TestProxyConnect(t *testing.T) {
 		"connection_refused": {
 			ProxyAddr: "127.0.0.1:1156",
 			ProxyOpts: &socks5.Options{
-				Logger:     &socks5.NoOutputLogger{},
+				Logger:     socks5.NopLogger,
 				ListenAddr: "127.0.0.1:1156",
 			},
 			DestinationUrl: "http://localhost:4000",
@@ -103,6 +108,7 @@ func TestProxyConnect(t *testing.T) {
 			RemoteServerAddr: "[::1]:9457",
 			ProxyAddr:        "127.0.0.1:1157",
 			ProxyOpts: &socks5.Options{
+				Logger:     socks5.NopLogger,
 				ListenAddr: "127.0.0.1:1157",
 			},
 			DestinationUrl: "http://[::1]:9457/ping",
@@ -111,7 +117,7 @@ func TestProxyConnect(t *testing.T) {
 		"host_unreachable": {
 			ProxyAddr: "127.0.0.1:1158",
 			ProxyOpts: &socks5.Options{
-				Logger:     &socks5.NoOutputLogger{},
+				Logger:     socks5.NopLogger,
 				ListenAddr: "127.0.0.1:1158",
 			},
 			DestinationUrl: "http://no_such_host.test",

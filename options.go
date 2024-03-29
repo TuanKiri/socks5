@@ -7,16 +7,16 @@ import (
 )
 
 type Options struct {
-	ListenAddr          string            // default: 127.0.0.1:1080
-	ReadTimeout         time.Duration     // default: none
-	WriteTimeout        time.Duration     // default: none
-	DialTimeout         time.Duration     // default: none
-	ConnDatabaseTimeout time.Duration     // default: 15 seconds
-	UserPassAuth        bool              // default: no authentication required
-	StaticCredentials   map[string]string // default: root / password
-	Logger              Logger            // default: stdoutLogger
-	Store               Store             // default: defaultStore
-	Driver              Driver            // default: defaultDriver
+	ListenAddr         string            // default: 127.0.0.1:1080
+	ReadTimeout        time.Duration     // default: none
+	WriteTimeout       time.Duration     // default: none
+	DialTimeout        time.Duration     // default: none
+	GetPasswordTimeout time.Duration     // default: none
+	UserPassAuth       bool              // default: no authentication required
+	StaticCredentials  map[string]string // default: root / password
+	Logger             Logger            // default: stdoutLogger
+	Store              Store             // default: defaultStore
+	Driver             Driver            // default: defaultDriver
 }
 
 func (o Options) authMethods() map[byte]struct{} {
@@ -24,7 +24,7 @@ func (o Options) authMethods() map[byte]struct{} {
 
 	switch {
 	case o.UserPassAuth:
-		methods[methodUsernamePassword] = struct{}{}
+		methods[usernamePasswordAuthentication] = struct{}{}
 	default:
 		methods[noAuthenticationRequired] = struct{}{}
 	}
@@ -37,13 +37,9 @@ func optsWithDefaults(opts *Options) *Options {
 		opts = &Options{}
 	}
 
-	if opts.ConnDatabaseTimeout == 0 {
-		opts.ConnDatabaseTimeout = 15 * time.Second
-	}
-
 	if opts.Logger == nil {
 		opts.Logger = &stdoutLogger{
-			errorLogger: log.New(os.Stdout, "time: ", log.Ldate|log.Ltime),
+			log: log.New(os.Stdout, "[socks5] - ", log.Ldate|log.Ltime),
 		}
 	}
 
