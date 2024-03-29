@@ -6,6 +6,8 @@
 
 [![license](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
 [![go version](https://img.shields.io/github/go-mod/go-version/JC5LZiy3HVfV5ux/socks5)](go.mod)
+[![go doc](https://godoc.org/github.com/JC5LZiy3HVfV5ux/socks5?status.svg)](https://pkg.go.dev/github.com/JC5LZiy3HVfV5ux/socks5)
+[![go report](https://goreportcard.com/badge/github.com/JC5LZiy3HVfV5ux/socks5)](https://goreportcard.com/report/github.com/JC5LZiy3HVfV5ux/socks5)
 
 Golang package for implementing a socks 5 proxy server.
 </div>
