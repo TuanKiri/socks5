@@ -15,5 +15,10 @@ func networkUnreachableError(err error) bool {
 }
 
 func connectionRefusedError(err error) bool {
-	return errors.Is(err, syscall.ECONNREFUSED)
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	}
+
+	// for example error: https://github.com/golang/go/issues/45621
+	return strings.Contains(err.Error(), "refused")
 }
