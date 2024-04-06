@@ -31,15 +31,26 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	// Options allowed as nil. Example options: 
 	// &socks5.Options{
 	//     ListenAddr: "127.0.0.1:5000",
 	// }
 	srv := socks5.New(nil)
 
-	// Default addr: 127.0.0.1:1080
-	if err := srv.ListenAndServe(); err != nil {
-	    log.Fatal(err)
+	go func() {
+		// Default address: 127.0.0.1:1080
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	if err := srv.Shutdown(); err != nil {
+		log.Fatal(err)
 	}
 }
 ```

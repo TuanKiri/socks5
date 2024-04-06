@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"errors"
+	"net"
 	"strings"
 	"syscall"
 )
@@ -21,4 +22,8 @@ func connectionRefusedError(err error) bool {
 
 	// for example error: https://github.com/golang/go/issues/45621
 	return strings.Contains(err.Error(), "refused")
+}
+
+func isClosedError(e error) bool {
+	return errors.Is(e, net.ErrClosed)
 }

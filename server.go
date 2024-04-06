@@ -15,10 +15,13 @@ type config struct {
 }
 
 type Server struct {
-	config *config
-	logger Logger
-	store  Store
-	driver Driver
+	config        *config
+	logger        Logger
+	store         Store
+	driver        Driver
+	active        chan struct{}
+	done          chan struct{}
+	closeListener func() error
 }
 
 func New(opts *Options) *Server {
@@ -34,6 +37,8 @@ func New(opts *Options) *Server {
 		logger: opts.Logger,
 		store:  opts.Store,
 		driver: opts.Driver,
+		active: make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 }
 
@@ -42,19 +47,44 @@ func (s *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	defer l.Close()
+	s.setListener(l)
+	defer s.closeListener()
 
-	s.logger.Info(context.Background(), "Server starting...")
+	ctx := context.Background()
 
-	for {
+	s.logger.Info(ctx, "server starting...")
+
+	for s.isActive() {
 		conn, err := l.Accept()
 		if err != nil {
-			s.logger.Error(context.Background(), "failed to accept connection: "+err.Error())
+			if !isClosedError(err) {
+				s.logger.Error(ctx, "failed to accept connection: "+err.Error())
+			}
+
 			continue
 		}
 
 		go s.serve(conn)
 	}
+
+	s.logger.Info(ctx, "server stopping...")
+
+	close(s.done)
+
+	return nil
+}
+
+func (s *Server) Shutdown() error {
+	if !s.isActive() {
+		return nil
+	}
+
+	close(s.active)
+	err := s.closeListener()
+
+	<-s.done
+
+	return err
 }
 
 func (s *Server) serve(conn net.Conn) {
@@ -77,5 +107,24 @@ func (s *Server) setConnDeadline(conn net.Conn) {
 
 	if s.config.writeTimeout != 0 {
 		conn.SetWriteDeadline(currentTime.Add(s.config.writeTimeout))
+	}
+}
+
+func (s *Server) isActive() bool {
+	select {
+	case <-s.active:
+		return false
+	default:
+		return true
+	}
+}
+
+func (s *Server) setListener(l net.Listener) {
+	s.closeListener = func() error {
+		if l == nil {
+			return nil
+		}
+
+		return l.Close()
 	}
 }
