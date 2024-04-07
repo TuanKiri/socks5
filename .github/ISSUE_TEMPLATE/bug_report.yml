@@ -1,0 +1,45 @@
+name: Bug report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system?
+      options:
+        - Linux (Default)
+        - Windows
+        - macOS
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browsers
+    attributes:
+      label: What browsers are you seeing the problem on?
+      multiple: true
+      options:
+        - None (Default)
+        - Firefox
+        - Chrome
+        - Safari
+        - Microsoft Edge
+      default: 0
+    validations:
+      required: true
+        
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
