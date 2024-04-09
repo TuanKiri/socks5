@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200" height="200">
+<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200">
 
 <h1>SOCKS 5 proxy</h1>
 
@@ -10,9 +10,12 @@
 [![go report](https://goreportcard.com/badge/github.com/JC5LZiy3HVfV5ux/socks5)](https://goreportcard.com/report/github.com/JC5LZiy3HVfV5ux/socks5)
 [![tests](https://github.com/JC5LZiy3HVfV5ux/socks5/workflows/Test/badge.svg)](https://github.com/JC5LZiy3HVfV5ux/socks5/actions?workflow=Test)
 
+<strong>[Report Bug](https://github.com/JC5LZiy3HVfV5ux/socks5/issues/new?assignees=&labels=bug&projects=&template=bug_report.yml&title=%5BBug%5D%3A+)</strong> | <strong>[Request Feature](https://github.com/JC5LZiy3HVfV5ux/socks5/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.yml&title=%5BEnhancement%5D%3A+)</strong>
+
 Golang package for implementing a SOCKS 5 proxy server.
 
-<strong>[Report Bug](https://github.com/JC5LZiy3HVfV5ux/socks5/issues/new?assignees=&labels=bug&projects=&template=bug_report.yml&title=%5BBug%5D%3A+)</strong> | <strong>[Request Feature](https://github.com/JC5LZiy3HVfV5ux/socks5/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.yml&title=%5BEnhancement%5D%3A+)</strong>
+<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/preview.gif?raw=true" width="480">
+
 </div>
 
 ## Installation
