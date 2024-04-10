@@ -1,5 +1,5 @@
 name: Bug report
-description: File a bug report
+description: Create a bug report for socks 5 server
 title: "[Bug]: "
 labels: ["bug"]
 body:
@@ -26,7 +26,6 @@ body:
     id: browsers
     attributes:
       label: What browsers are you seeing the problem on?
-      multiple: true
       options:
         - None (Default)
         - Firefox

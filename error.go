@@ -24,6 +24,6 @@ func connectionRefusedError(err error) bool {
 	return strings.Contains(err.Error(), "refused")
 }
 
-func isClosedError(e error) bool {
+func closedListenerError(e error) bool {
 	return errors.Is(e, net.ErrClosed)
 }

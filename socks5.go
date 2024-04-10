@@ -97,72 +97,72 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bu
 		return
 	}
 
-	var addr address
+	var address address
 
-	addr.Type, err = reader.ReadByte()
+	address.Type, err = reader.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read address type: "+err.Error())
 		return
 	}
 
-	switch addr.Type {
+	switch address.Type {
 	case addressTypeIPv4:
-		addr.IP = make(net.IP, net.IPv4len)
-		if _, err := reader.Read(addr.IP); err != nil {
+		address.IP = make(net.IP, net.IPv4len)
+		if _, err := reader.Read(address.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv4 address: "+err.Error())
 			return
 		}
 	case addressTypeFQDN:
-		addr.DomainLen, err = reader.ReadByte()
+		address.DomainLen, err = reader.ReadByte()
 		if err != nil {
 			s.logger.Error(ctx, "failed to read domain length: "+err.Error())
 			return
 		}
 
-		addr.Domain = make([]byte, addr.DomainLen)
-		if _, err := reader.Read(addr.Domain); err != nil {
+		address.Domain = make([]byte, address.DomainLen)
+		if _, err := reader.Read(address.Domain); err != nil {
 			s.logger.Error(ctx, "failed to read domain: "+err.Error())
 			return
 		}
 	case addressTypeIPv6:
-		addr.IP = make(net.IP, net.IPv6len)
-		if _, err := reader.Read(addr.IP); err != nil {
+		address.IP = make(net.IP, net.IPv6len)
+		if _, err := reader.Read(address.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv6 address: "+err.Error())
 			return
 		}
 	default:
-		s.replyRequest(ctx, writer, addressTypeNotSupported, addr)
+		s.replyRequest(ctx, writer, addressTypeNotSupported, &address)
 		return
 	}
 
-	addr.Port = make([]byte, 2)
-	if _, err := reader.Read(addr.Port); err != nil {
+	address.Port = make([]byte, 2)
+	if _, err := reader.Read(address.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port: "+err.Error())
 		return
 	}
 
 	switch command {
 	case commandConnect:
-		s.connect(ctx, writer, reader, addr)
+		s.connect(ctx, writer, reader, &address)
 	default:
-		s.replyRequest(ctx, writer, commandNotSupported, addr)
+		s.replyRequest(ctx, writer, commandNotSupported, &address)
 		return
 	}
 }
 
-func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Reader, addr address) {
-	target, err := s.driver.Dial(addr.String())
+func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Reader, address *address) {
+	target, err := s.driver.Dial(address.String())
 	if err != nil {
-		s.replyRequestWithError(ctx, writer, err, addr)
+		s.replyRequestWithError(ctx, writer, err, address)
 
-		s.logger.Error(ctx, "dial "+addr.String()+": "+err.Error())
+		s.logger.Error(ctx, "dial "+address.String()+": "+err.Error())
 		return
 	}
 	defer target.Close()
 
-	s.replyRequest(ctx, writer, connectionSuccessful, addr)
+	s.replyRequest(ctx, writer, connectionSuccessful, address)
 
-	s.logger.Info(ctx, "dial "+addr.String())
+	s.logger.Info(ctx, "dial "+address.String())
 
 	var g errgroup.Group
 
@@ -179,34 +179,34 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Re
 	}
 }
 
-func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, addr address) {
+func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, address *address) {
 	switch {
 	case networkUnreachableError(err):
-		s.replyRequest(ctx, writer, networkUnreachable, addr)
+		s.replyRequest(ctx, writer, networkUnreachable, address)
 	case noSuchHostError(err):
-		s.replyRequest(ctx, writer, hostUnreachable, addr)
+		s.replyRequest(ctx, writer, hostUnreachable, address)
 	case connectionRefusedError(err):
-		s.replyRequest(ctx, writer, connectionRefused, addr)
+		s.replyRequest(ctx, writer, connectionRefused, address)
 	default:
-		s.replyRequest(ctx, writer, generalSOCKSserverFailure, addr)
+		s.replyRequest(ctx, writer, generalSOCKSserverFailure, address)
 	}
 }
 
-func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte, addr address) {
+func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte, address *address) {
 	fields := []byte{
 		0x00, // Reserved byte
-		addr.Type,
+		address.Type,
 	}
 
-	switch addr.Type {
+	switch address.Type {
 	case addressTypeIPv4, addressTypeIPv6:
-		fields = append(fields, addr.IP...)
+		fields = append(fields, address.IP...)
 	case addressTypeFQDN:
-		fields = append(fields, addr.DomainLen)
-		fields = append(fields, addr.Domain...)
+		fields = append(fields, address.DomainLen)
+		fields = append(fields, address.Domain...)
 	}
 
-	fields = append(fields, addr.Port...)
+	fields = append(fields, address.Port...)
 
 	s.response(ctx, writer, version5, status, fields...)
 }

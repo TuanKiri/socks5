@@ -41,7 +41,8 @@ func main() {
 
 	// Options allowed as nil. Example options: 
 	// &socks5.Options{
-	//     ListenAddr: "127.0.0.1:5000",
+	//     Authentication: true,
+	//     ListenAddress:  "0.0.0.0:1080",
 	// }
 	srv := socks5.New(nil)
 

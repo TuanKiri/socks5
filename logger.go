@@ -32,9 +32,7 @@ func (l *stdoutLogger) print(ctx context.Context, level, msg string, args ...any
 	output := fmt.Sprintf("- %s - %s %s", level, msg, fmt.Sprintln(args...))
 
 	if remoteAddress, ok := RemoteAddressFromContext(ctx); ok {
-		addressColumn := "- " + remoteAddress
-
-		output = fmt.Sprintf("%s %s", addressColumn, output)
+		output = fmt.Sprintf("- %s %s", remoteAddress, output)
 	}
 
 	l.log.Print(output)

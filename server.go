@@ -48,7 +48,6 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 	s.setListener(l)
-	defer s.closeListener()
 
 	ctx := context.Background()
 
@@ -57,7 +56,7 @@ func (s *Server) ListenAndServe() error {
 	for s.isActive() {
 		conn, err := l.Accept()
 		if err != nil {
-			if !isClosedError(err) {
+			if !closedListenerError(err) {
 				s.logger.Error(ctx, "failed to accept connection: "+err.Error())
 			}
 

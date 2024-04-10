@@ -41,25 +41,25 @@ lPQTC4uW7AAywREZ2ekd8XUX8JwdTJHmPg==
 
 type testTLSDial struct{}
 
-func (p testTLSDial) Dial(network, addr string) (c net.Conn, err error) {
-	return tls.Dial(network, addr, &tls.Config{InsecureSkipVerify: true})
+func (p testTLSDial) Dial(network, address string) (c net.Conn, err error) {
+	return tls.Dial(network, address, &tls.Config{InsecureSkipVerify: true})
 }
 
 type testTLSDriver struct {
-	listenAddr string
-	tlsConfig  *tls.Config
+	listenAddress string
+	tlsConfig     *tls.Config
 }
 
 func (d testTLSDriver) Listen() (net.Listener, error) {
-	return tls.Listen("tcp", d.listenAddr, d.tlsConfig)
+	return tls.Listen("tcp", d.listenAddress, d.tlsConfig)
 }
 
-func (d testTLSDriver) Dial(addr string) (net.Conn, error) {
-	return tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true})
+func (d testTLSDriver) Dial(address string) (net.Conn, error) {
+	return tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
 }
 
-func runRemoteServer(addr string, useTLS bool) {
-	if addr == "" {
+func runRemoteServer(address string, useTLS bool) {
+	if address == "" {
 		return
 	}
 
@@ -70,25 +70,25 @@ func runRemoteServer(addr string, useTLS bool) {
 	})
 
 	if useTLS {
-		if err := listenAndServeTLS(addr, mux); err != nil {
+		if err := listenAndServeTLS(address, mux); err != nil {
 			log.Fatalf("runRemoteServer: %v", err)
 		}
 		return
 	}
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(address, mux); err != nil {
 		log.Fatalf("runRemoteServer: %v", err)
 	}
 }
 
-func listenAndServeTLS(addr string, handler http.Handler) error {
+func listenAndServeTLS(address string, handler http.Handler) error {
 	cert, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
 	if err != nil {
 		return err
 	}
 
 	server := http.Server{
-		Addr: addr,
+		Addr: address,
 		TLSConfig: &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		},
@@ -106,7 +106,7 @@ func runProxy(opts *socks5.Options, useTLS bool) {
 		}
 
 		opts.Driver = &testTLSDriver{
-			listenAddr: opts.ListenAddr,
+			listenAddress: opts.ListenAddress,
 			tlsConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 			},
@@ -120,10 +120,10 @@ func runProxy(opts *socks5.Options, useTLS bool) {
 	}
 }
 
-func setupClient(proxyUrl string, auth *proxy.Auth) (*http.Client, error) {
+func setupClient(proxyAddress string, auth *proxy.Auth) (*http.Client, error) {
 	socksProxy, err := proxy.SOCKS5(
 		"tcp",
-		proxyUrl,
+		proxyAddress,
 		auth,
 		proxy.Direct,
 	)
@@ -133,7 +133,7 @@ func setupClient(proxyUrl string, auth *proxy.Auth) (*http.Client, error) {
 
 	tlsSocksProxy, err := proxy.SOCKS5(
 		"tcp",
-		proxyUrl,
+		proxyAddress,
 		auth,
 		&testTLSDial{},
 	)

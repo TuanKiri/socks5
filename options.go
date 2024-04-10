@@ -7,12 +7,12 @@ import (
 )
 
 type Options struct {
-	ListenAddr         string            // default: 127.0.0.1:1080
+	ListenAddress      string            // default: 127.0.0.1:1080
 	ReadTimeout        time.Duration     // default: none
 	WriteTimeout       time.Duration     // default: none
 	DialTimeout        time.Duration     // default: none
 	GetPasswordTimeout time.Duration     // default: none
-	UserPassAuth       bool              // default: no authentication required
+	Authentication     bool              // default: no authentication required
 	StaticCredentials  map[string]string // default: root / password
 	Logger             Logger            // default: stdoutLogger
 	Store              Store             // default: defaultStore
@@ -23,7 +23,7 @@ func (o Options) authMethods() map[byte]struct{} {
 	methods := make(map[byte]struct{})
 
 	switch {
-	case o.UserPassAuth:
+	case o.Authentication:
 		methods[usernamePasswordAuthentication] = struct{}{}
 	default:
 		methods[noAuthenticationRequired] = struct{}{}
@@ -56,13 +56,13 @@ func optsWithDefaults(opts *Options) *Options {
 	}
 
 	if opts.Driver == nil {
-		if opts.ListenAddr == "" {
-			opts.ListenAddr = "127.0.0.1:1080"
+		if opts.ListenAddress == "" {
+			opts.ListenAddress = "127.0.0.1:1080"
 		}
 
 		opts.Driver = &defaultDriver{
-			listenAddr:  opts.ListenAddr,
-			dialTimeout: opts.DialTimeout,
+			listenAddress: opts.ListenAddress,
+			dialTimeout:   opts.DialTimeout,
 		}
 	}
 
