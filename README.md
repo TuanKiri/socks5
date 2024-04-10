@@ -76,6 +76,8 @@ See the [tests](socks5_test.go) for more information about package.
 
     Not all applications and browsers support socks authentication or socks protocol. You may need [extension](https://github.com/txthinking/socks5-configurator) for Chrome or another browser.
 
+If you have any questions, you can ask in [GitHub Discussions](https://github.com/JC5LZiy3HVfV5ux/socks5/discussions/new?category=q-a).
+
 ## References
 
 * [RFC 1928](https://www.rfc-editor.org/rfc/rfc1928.txt) SOCKS Protocol Version 5
