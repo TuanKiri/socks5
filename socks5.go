@@ -167,11 +167,15 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Re
 	var g errgroup.Group
 
 	g.Go(func() error {
-		return relay(target, reader)
+		n, err := relay(target, reader)
+		s.metrics.UploadBytes(ctx, n)
+		return err
 	})
 
 	g.Go(func() error {
-		return relay(writer, target)
+		n, err := relay(writer, target)
+		s.metrics.DownloadBytes(ctx, n)
+		return err
 	})
 
 	if err = g.Wait(); err != nil {

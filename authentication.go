@@ -39,6 +39,8 @@ func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Wri
 		return
 	}
 
+	ctx = contextWithUsername(ctx, string(username))
+
 	passwordLen, err := reader.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read password length: "+err.Error())

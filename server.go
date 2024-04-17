@@ -19,6 +19,7 @@ type Server struct {
 	logger        Logger
 	store         Store
 	driver        Driver
+	metrics       Metrics
 	active        chan struct{}
 	done          chan struct{}
 	closeListener func() error
@@ -34,11 +35,12 @@ func New(opts *Options) *Server {
 			getPasswordTimeout: opts.GetPasswordTimeout,
 			authMethods:        opts.authMethods(),
 		},
-		logger: opts.Logger,
-		store:  opts.Store,
-		driver: opts.Driver,
-		active: make(chan struct{}),
-		done:   make(chan struct{}),
+		logger:  opts.Logger,
+		store:   opts.Store,
+		driver:  opts.Driver,
+		metrics: opts.Metrics,
+		active:  make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 }
 

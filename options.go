@@ -17,6 +17,7 @@ type Options struct {
 	Logger             Logger            // default: stdoutLogger
 	Store              Store             // default: defaultStore
 	Driver             Driver            // default: defaultDriver
+	Metrics            Metrics           // default: nopMetrics
 }
 
 func (o Options) authMethods() map[byte]struct{} {
@@ -64,6 +65,10 @@ func optsWithDefaults(opts *Options) *Options {
 			listenAddress: opts.ListenAddress,
 			dialTimeout:   opts.DialTimeout,
 		}
+	}
+
+	if opts.Metrics == nil {
+		opts.Metrics = &nopMetrics{}
 	}
 
 	return opts
