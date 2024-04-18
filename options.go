@@ -8,6 +8,7 @@ import (
 
 type Options struct {
 	ListenAddress      string            // default: 127.0.0.1:1080
+	BindAddress        string            // default: 127.0.0.1 Only hostname, port is assigned automatically.
 	ReadTimeout        time.Duration     // default: none
 	WriteTimeout       time.Duration     // default: none
 	DialTimeout        time.Duration     // default: none
@@ -61,8 +62,13 @@ func optsWithDefaults(opts *Options) *Options {
 			opts.ListenAddress = "127.0.0.1:1080"
 		}
 
+		if opts.BindAddress == "" {
+			opts.BindAddress = "127.0.0.1"
+		}
+
 		opts.Driver = &defaultDriver{
 			listenAddress: opts.ListenAddress,
+			bindAddress:   opts.BindAddress,
 			dialTimeout:   opts.DialTimeout,
 		}
 	}

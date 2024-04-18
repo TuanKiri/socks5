@@ -58,6 +58,10 @@ func (d testTLSDriver) Dial(address string) (net.Conn, error) {
 	return tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
 }
 
+func (d testTLSDriver) ListenUDP() (*net.UDPConn, error) {
+	return nil, nil
+}
+
 func runRemoteServer(address string, useTLS bool) {
 	if address == "" {
 		return

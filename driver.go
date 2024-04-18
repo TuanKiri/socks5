@@ -7,18 +7,29 @@ import (
 
 type Driver interface {
 	Listen() (net.Listener, error)
+	ListenUDP() (*net.UDPConn, error)
 	Dial(address string) (net.Conn, error)
 }
 
 type defaultDriver struct {
 	listenAddress string
+	bindAddress   string
 	dialTimeout   time.Duration
 }
 
-func (d defaultDriver) Listen() (net.Listener, error) {
+func (d *defaultDriver) Listen() (net.Listener, error) {
 	return net.Listen("tcp", d.listenAddress)
 }
 
-func (d defaultDriver) Dial(address string) (net.Conn, error) {
+func (d *defaultDriver) ListenUDP() (*net.UDPConn, error) {
+	address, err := net.ResolveUDPAddr("udp", d.bindAddress+":0")
+	if err != nil {
+		return nil, err
+	}
+
+	return net.ListenUDP("udp", address)
+}
+
+func (d *defaultDriver) Dial(address string) (net.Conn, error) {
 	return net.DialTimeout("tcp", address, d.dialTimeout)
 }

@@ -24,7 +24,8 @@ const (
 	addressTypeFQDN byte = 0x03
 	addressTypeIPv6 byte = 0x04
 
-	commandConnect byte = 0x01
+	connect      byte = 0x01
+	udpAssociate byte = 0x03
 
 	connectionSuccessful      byte = 0x00
 	generalSOCKSserverFailure byte = 0x01
@@ -142,8 +143,10 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bu
 	}
 
 	switch command {
-	case commandConnect:
+	case connect:
 		s.connect(ctx, writer, reader, &address)
+	case udpAssociate:
+		s.udpAssociate(ctx, writer)
 	default:
 		s.replyRequest(ctx, writer, commandNotSupported, &address)
 		return
@@ -181,6 +184,33 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Re
 	if err = g.Wait(); err != nil {
 		s.logger.Error(ctx, "error sync wait group: "+err.Error())
 	}
+}
+
+func (s *Server) udpAssociate(ctx context.Context, writer io.Writer) {
+	conn, err := s.driver.ListenUDP()
+	if err != nil {
+		s.replyRequestWithError(ctx, writer, err, &address{})
+
+		s.logger.Error(ctx, "error listen udp: "+err.Error())
+		return
+	}
+	defer conn.Close()
+
+	var address address
+
+	host, port, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		s.replyRequestWithError(ctx, writer, err, &address)
+
+		s.logger.Error(ctx, "error split host port: "+err.Error())
+		return
+	}
+
+	address.Type = addressTypeIPv4
+	address.IP = net.ParseIP(host)
+	address.Port = parsePort(port)
+
+	s.replyRequest(ctx, writer, connectionSuccessful, &address)
 }
 
 func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, address *address) {
