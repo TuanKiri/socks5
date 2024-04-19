@@ -14,6 +14,10 @@
 
 Golang package for implementing a SOCKS 5 proxy server.
 
+| CONNECT | BIND | ASSOCIATE |
+| :---: | :---: | :---: |
+| ✅ - implemented | ❌ - not implemented | 🛠 - in progress | 
+
 <img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/preview.gif?raw=true" width="480">
 
 </div>
