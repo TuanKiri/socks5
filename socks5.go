@@ -203,8 +203,10 @@ func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte
 	}
 
 	switch address.Type {
-	case addressTypeIPv4, addressTypeIPv6:
-		fields = append(fields, address.IP...)
+	case addressTypeIPv4:
+		fields = append(fields, address.IP.To4()...)
+	case addressTypeIPv6:
+		fields = append(fields, address.IP.To16()...)
 	case addressTypeFQDN:
 		fields = append(fields, address.DomainLen)
 		fields = append(fields, address.Domain...)
