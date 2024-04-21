@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"net"
 	"time"
@@ -58,7 +57,7 @@ func (s *Server) ListenAndServe() error {
 	for s.isActive() {
 		conn, err := l.Accept()
 		if err != nil {
-			if !closedListenerError(err) {
+			if !isClosedListenerError(err) {
 				s.logger.Error(ctx, "failed to accept connection: "+err.Error())
 			}
 
@@ -93,7 +92,7 @@ func (s *Server) serve(conn net.Conn) {
 
 	s.setConnDeadline(conn)
 
-	reader := bufio.NewReader(conn)
+	reader := newReader(conn)
 	ctx := contextWithRemoteAddress(context.Background(), conn.RemoteAddr().String())
 
 	s.handshake(ctx, conn, reader)

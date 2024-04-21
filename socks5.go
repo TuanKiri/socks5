@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net"
@@ -36,7 +35,7 @@ const (
 	addressTypeNotSupported   byte = 0x08
 )
 
-func (s *Server) handshake(ctx context.Context, writer io.Writer, reader *bufio.Reader) {
+func (s *Server) handshake(ctx context.Context, writer io.Writer, reader reader) {
 	version, err := reader.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
@@ -75,7 +74,7 @@ func (s *Server) handshake(ctx context.Context, writer io.Writer, reader *bufio.
 	}
 }
 
-func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bufio.Reader) {
+func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader reader) {
 	version, err := reader.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
@@ -146,14 +145,14 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bu
 	case connect:
 		s.connect(ctx, writer, reader, &address)
 	case udpAssociate:
-		s.udpAssociate(ctx, writer)
+		s.udpAssociate(ctx, writer, reader)
 	default:
 		s.replyRequest(ctx, writer, commandNotSupported, &address)
 		return
 	}
 }
 
-func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Reader, address *address) {
+func (s *Server) connect(ctx context.Context, writer io.Writer, reader reader, address *address) {
 	target, err := s.driver.Dial(address.String())
 	if err != nil {
 		s.replyRequestWithError(ctx, writer, err, address)
@@ -186,7 +185,7 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Re
 	}
 }
 
-func (s *Server) udpAssociate(ctx context.Context, writer io.Writer) {
+func (s *Server) udpAssociate(ctx context.Context, writer io.Writer, reader reader) {
 	conn, err := s.driver.ListenUDP()
 	if err != nil {
 		s.replyRequestWithError(ctx, writer, err, &address{})
@@ -194,7 +193,6 @@ func (s *Server) udpAssociate(ctx context.Context, writer io.Writer) {
 		s.logger.Error(ctx, "error listen udp: "+err.Error())
 		return
 	}
-	defer conn.Close()
 
 	var address address
 
@@ -210,16 +208,40 @@ func (s *Server) udpAssociate(ctx context.Context, writer io.Writer) {
 	address.IP = net.ParseIP(host)
 	address.Port = parsePort(port)
 
+	go func() {
+		if _, err := reader.ReadByte(); err != nil {
+			conn.Close()
+		}
+	}()
+
 	s.replyRequest(ctx, writer, connectionSuccessful, &address)
+
+	s.logger.Info(ctx, "start of udp datagram forwarding")
+
+	// While reader is active, tcp connection is also active
+	for reader.IsActive() {
+		datagram := make([]byte, 1024)
+
+		_, _, err := conn.ReadFromUDP(datagram)
+		if err != nil {
+			if !isClosedListenerError(err) {
+				s.logger.Error(ctx, "error read datagram from udp: "+err.Error())
+			}
+
+			continue
+		}
+	}
+
+	s.logger.Info(ctx, "udp datagram forwarding complete")
 }
 
 func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, address *address) {
 	switch {
-	case networkUnreachableError(err):
+	case isNetworkUnreachableError(err):
 		s.replyRequest(ctx, writer, networkUnreachable, address)
-	case noSuchHostError(err):
+	case isNoSuchHostError(err):
 		s.replyRequest(ctx, writer, hostUnreachable, address)
-	case connectionRefusedError(err):
+	case isConnectionRefusedError(err):
 		s.replyRequest(ctx, writer, connectionRefused, address)
 	default:
 		s.replyRequest(ctx, writer, generalSOCKSserverFailure, address)

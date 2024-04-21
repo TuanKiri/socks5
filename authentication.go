@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"io"
 )
@@ -16,7 +15,7 @@ func (s *Server) choiceAuthenticationMethod(methods []byte) byte {
 	return noAcceptableMethods
 }
 
-func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Writer, reader *bufio.Reader) {
+func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Writer, reader reader) {
 	version, err := reader.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read authentication version: "+err.Error())
