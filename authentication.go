@@ -1,9 +1,6 @@
 package socks5
 
-import (
-	"context"
-	"io"
-)
+import "context"
 
 func (s *Server) choiceAuthenticationMethod(methods []byte) byte {
 	for _, method := range methods {
@@ -15,8 +12,8 @@ func (s *Server) choiceAuthenticationMethod(methods []byte) byte {
 	return noAcceptableMethods
 }
 
-func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Writer, reader reader) {
-	version, err := reader.ReadByte()
+func (s *Server) usernamePasswordAuthenticate(ctx context.Context, conn connection) {
+	version, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read authentication version: "+err.Error())
 		return
@@ -26,28 +23,28 @@ func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Wri
 		return
 	}
 
-	usernameLen, err := reader.ReadByte()
+	usernameLen, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read username length: "+err.Error())
 		return
 	}
 
 	username := make([]byte, usernameLen)
-	if _, err := reader.Read(username); err != nil {
+	if _, err := conn.Read(username); err != nil {
 		s.logger.Error(ctx, "failed to read username: "+err.Error())
 		return
 	}
 
 	ctx = contextWithUsername(ctx, string(username))
 
-	passwordLen, err := reader.ReadByte()
+	passwordLen, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read password length: "+err.Error())
 		return
 	}
 
 	password := make([]byte, passwordLen)
-	if _, err := reader.Read(password); err != nil {
+	if _, err := conn.Read(password); err != nil {
 		s.logger.Error(ctx, "failed to read password: "+err.Error())
 		return
 	}
@@ -64,11 +61,11 @@ func (s *Server) usernamePasswordAuthenticate(ctx context.Context, writer io.Wri
 	if string(password) != passwordFromStore {
 		s.logger.Warn(ctx, "failed to authenticate user ["+string(username)+"]")
 
-		s.response(ctx, writer, usernamePasswordVersion, usernamePasswordFailure)
+		s.response(ctx, conn, usernamePasswordVersion, usernamePasswordFailure)
 		return
 	}
 
-	s.response(ctx, writer, usernamePasswordVersion, usernamePasswordSuccess)
+	s.response(ctx, conn, usernamePasswordVersion, usernamePasswordSuccess)
 
-	s.acceptRequest(ctx, writer, reader)
+	s.acceptRequest(ctx, conn)
 }

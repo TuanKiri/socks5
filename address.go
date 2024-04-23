@@ -44,3 +44,17 @@ func parsePort(s string) port {
 
 	return bigInt.Bytes()
 }
+
+func equalHosts(first, second string) bool {
+	firstHost, _, err := net.SplitHostPort(first)
+	if err != nil {
+		return false
+	}
+
+	secondHost, _, err := net.SplitHostPort(second)
+	if err != nil {
+		return false
+	}
+
+	return firstHost == secondHost
+}

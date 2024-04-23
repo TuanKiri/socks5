@@ -2,7 +2,6 @@ package socks5
 
 import (
 	"context"
-	"io"
 	"net"
 
 	"golang.org/x/sync/errgroup"
@@ -35,8 +34,8 @@ const (
 	addressTypeNotSupported   byte = 0x08
 )
 
-func (s *Server) handshake(ctx context.Context, writer io.Writer, reader reader) {
-	version, err := reader.ReadByte()
+func (s *Server) handshake(ctx context.Context, conn connection) {
+	version, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
 		return
@@ -46,14 +45,14 @@ func (s *Server) handshake(ctx context.Context, writer io.Writer, reader reader)
 		return
 	}
 
-	numMethods, err := reader.ReadByte()
+	numMethods, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read number of authentication methods: "+err.Error())
 		return
 	}
 
 	methods := make([]byte, numMethods)
-	if _, err := reader.Read(methods); err != nil {
+	if _, err := conn.Read(methods); err != nil {
 		s.logger.Error(ctx, "failed to read authentication methods: "+err.Error())
 		return
 	}
@@ -61,21 +60,21 @@ func (s *Server) handshake(ctx context.Context, writer io.Writer, reader reader)
 	method := s.choiceAuthenticationMethod(methods)
 	switch method {
 	case noAuthenticationRequired:
-		s.response(ctx, writer, version5, noAuthenticationRequired)
+		s.response(ctx, conn, version5, noAuthenticationRequired)
 
-		s.acceptRequest(ctx, writer, reader)
+		s.acceptRequest(ctx, conn)
 	case usernamePasswordAuthentication:
-		s.response(ctx, writer, version5, usernamePasswordAuthentication)
+		s.response(ctx, conn, version5, usernamePasswordAuthentication)
 
-		s.usernamePasswordAuthenticate(ctx, writer, reader)
+		s.usernamePasswordAuthenticate(ctx, conn)
 	default:
-		s.response(ctx, writer, version5, noAcceptableMethods)
+		s.response(ctx, conn, version5, noAcceptableMethods)
 		return
 	}
 }
 
-func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader reader) {
-	version, err := reader.ReadByte()
+func (s *Server) acceptRequest(ctx context.Context, conn connection) {
+	version, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
 		return
@@ -85,21 +84,21 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader rea
 		return
 	}
 
-	command, err := reader.ReadByte()
+	command, err := conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read command: "+err.Error())
 		return
 	}
 
 	// Reserved byte: 0x00
-	if _, err := reader.ReadByte(); err != nil {
+	if _, err := conn.ReadByte(); err != nil {
 		s.logger.Error(ctx, "failed to read reserved byte: "+err.Error())
 		return
 	}
 
 	var address address
 
-	address.Type, err = reader.ReadByte()
+	address.Type, err = conn.ReadByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read address type: "+err.Error())
 		return
@@ -108,74 +107,74 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader rea
 	switch address.Type {
 	case addressTypeIPv4:
 		address.IP = make(net.IP, net.IPv4len)
-		if _, err := reader.Read(address.IP); err != nil {
+		if _, err := conn.Read(address.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv4 address: "+err.Error())
 			return
 		}
 	case addressTypeFQDN:
-		address.DomainLen, err = reader.ReadByte()
+		address.DomainLen, err = conn.ReadByte()
 		if err != nil {
 			s.logger.Error(ctx, "failed to read domain length: "+err.Error())
 			return
 		}
 
 		address.Domain = make([]byte, address.DomainLen)
-		if _, err := reader.Read(address.Domain); err != nil {
+		if _, err := conn.Read(address.Domain); err != nil {
 			s.logger.Error(ctx, "failed to read domain: "+err.Error())
 			return
 		}
 	case addressTypeIPv6:
 		address.IP = make(net.IP, net.IPv6len)
-		if _, err := reader.Read(address.IP); err != nil {
+		if _, err := conn.Read(address.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv6 address: "+err.Error())
 			return
 		}
 	default:
-		s.replyRequest(ctx, writer, addressTypeNotSupported, &address)
+		s.replyRequest(ctx, conn, addressTypeNotSupported, &address)
 		return
 	}
 
 	address.Port = make([]byte, 2)
-	if _, err := reader.Read(address.Port); err != nil {
+	if _, err := conn.Read(address.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port: "+err.Error())
 		return
 	}
 
 	switch command {
 	case connect:
-		s.connect(ctx, writer, reader, &address)
+		s.connect(ctx, conn, &address)
 	case udpAssociate:
-		s.udpAssociate(ctx, writer, reader)
+		s.udpAssociate(ctx, conn)
 	default:
-		s.replyRequest(ctx, writer, commandNotSupported, &address)
+		s.replyRequest(ctx, conn, commandNotSupported, &address)
 		return
 	}
 }
 
-func (s *Server) connect(ctx context.Context, writer io.Writer, reader reader, address *address) {
+func (s *Server) connect(ctx context.Context, conn connection, address *address) {
 	target, err := s.driver.Dial(address.String())
 	if err != nil {
-		s.replyRequestWithError(ctx, writer, err, address)
+		s.replyRequestWithError(ctx, conn, err, address)
 
 		s.logger.Error(ctx, "dial "+address.String()+": "+err.Error())
 		return
 	}
 	defer target.Close()
 
-	s.replyRequest(ctx, writer, connectionSuccessful, address)
+	s.replyRequest(ctx, conn, connectionSuccessful, address)
 
 	s.logger.Info(ctx, "dial "+address.String())
 
 	var g errgroup.Group
 
 	g.Go(func() error {
-		n, err := relay(target, reader)
+		n, err := relay(target, conn)
 		s.metrics.UploadBytes(ctx, n)
 		return err
 	})
 
 	g.Go(func() error {
-		n, err := relay(writer, target)
+		n, err := relay(conn, target)
 		s.metrics.DownloadBytes(ctx, n)
 		return err
 	})
@@ -185,10 +184,10 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader reader, a
 	}
 }
 
-func (s *Server) udpAssociate(ctx context.Context, writer io.Writer, reader reader) {
-	conn, err := s.driver.ListenUDP()
+func (s *Server) udpAssociate(ctx context.Context, conn connection) {
+	l, err := s.driver.ListenUDP()
 	if err != nil {
-		s.replyRequestWithError(ctx, writer, err, &address{})
+		s.replyRequestWithError(ctx, conn, err, &address{})
 
 		s.logger.Error(ctx, "error listen udp: "+err.Error())
 		return
@@ -196,9 +195,9 @@ func (s *Server) udpAssociate(ctx context.Context, writer io.Writer, reader read
 
 	var address address
 
-	host, port, err := net.SplitHostPort(conn.LocalAddr().String())
+	host, port, err := net.SplitHostPort(l.LocalAddr().String())
 	if err != nil {
-		s.replyRequestWithError(ctx, writer, err, &address)
+		s.replyRequestWithError(ctx, conn, err, &address)
 
 		s.logger.Error(ctx, "error split host port: "+err.Error())
 		return
@@ -208,21 +207,15 @@ func (s *Server) udpAssociate(ctx context.Context, writer io.Writer, reader read
 	address.IP = net.ParseIP(host)
 	address.Port = parsePort(port)
 
-	go func() {
-		if _, err := reader.ReadByte(); err != nil {
-			conn.Close()
-		}
-	}()
-
-	s.replyRequest(ctx, writer, connectionSuccessful, &address)
+	s.replyRequest(ctx, conn, connectionSuccessful, &address)
 
 	s.logger.Info(ctx, "start of udp datagram forwarding")
 
-	// While reader is active, tcp connection is also active
-	for reader.IsActive() {
-		datagram := make([]byte, 1024)
+	// While tcp connection is active
+	for conn.IsActive() {
+		datagram := make([]byte, 65507)
 
-		_, _, err := conn.ReadFromUDP(datagram)
+		_, remoteAddress, err := l.ReadFromUDP(datagram)
 		if err != nil {
 			if !isClosedListenerError(err) {
 				s.logger.Error(ctx, "error read datagram from udp: "+err.Error())
@@ -230,25 +223,29 @@ func (s *Server) udpAssociate(ctx context.Context, writer io.Writer, reader read
 
 			continue
 		}
+
+		if !equalHosts(conn.RemoteAddress(), remoteAddress.String()) {
+			continue
+		}
 	}
 
 	s.logger.Info(ctx, "udp datagram forwarding complete")
 }
 
-func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, address *address) {
+func (s *Server) replyRequestWithError(ctx context.Context, conn connection, err error, address *address) {
 	switch {
 	case isNetworkUnreachableError(err):
-		s.replyRequest(ctx, writer, networkUnreachable, address)
+		s.replyRequest(ctx, conn, networkUnreachable, address)
 	case isNoSuchHostError(err):
-		s.replyRequest(ctx, writer, hostUnreachable, address)
+		s.replyRequest(ctx, conn, hostUnreachable, address)
 	case isConnectionRefusedError(err):
-		s.replyRequest(ctx, writer, connectionRefused, address)
+		s.replyRequest(ctx, conn, connectionRefused, address)
 	default:
-		s.replyRequest(ctx, writer, generalSOCKSserverFailure, address)
+		s.replyRequest(ctx, conn, generalSOCKSserverFailure, address)
 	}
 }
 
-func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte, address *address) {
+func (s *Server) replyRequest(ctx context.Context, conn connection, status byte, address *address) {
 	fields := []byte{
 		0x00, // Reserved byte
 		address.Type,
@@ -266,10 +263,10 @@ func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte
 
 	fields = append(fields, address.Port...)
 
-	s.response(ctx, writer, version5, status, fields...)
+	s.response(ctx, conn, version5, status, fields...)
 }
 
-func (s *Server) response(ctx context.Context, writer io.Writer, version, status byte, fields ...byte) {
+func (s *Server) response(ctx context.Context, conn connection, version, status byte, fields ...byte) {
 	res := []byte{
 		version,
 		status,
@@ -277,7 +274,7 @@ func (s *Server) response(ctx context.Context, writer io.Writer, version, status
 
 	res = append(res, fields...)
 
-	if _, err := writer.Write(res); err != nil {
+	if _, err := conn.Write(res); err != nil {
 		s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
 	}
 }

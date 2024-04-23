@@ -92,10 +92,9 @@ func (s *Server) serve(conn net.Conn) {
 
 	s.setConnDeadline(conn)
 
-	reader := newReader(conn)
 	ctx := contextWithRemoteAddress(context.Background(), conn.RemoteAddr().String())
 
-	s.handshake(ctx, conn, reader)
+	s.handshake(ctx, newConnection(conn))
 }
 
 func (s *Server) setConnDeadline(conn net.Conn) {
