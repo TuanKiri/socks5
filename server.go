@@ -11,6 +11,7 @@ type config struct {
 	writeTimeout       time.Duration
 	getPasswordTimeout time.Duration
 	authMethods        map[byte]struct{}
+	publicIP           net.IP
 }
 
 type Server struct {
@@ -33,6 +34,7 @@ func New(opts *Options) *Server {
 			writeTimeout:       opts.WriteTimeout,
 			getPasswordTimeout: opts.GetPasswordTimeout,
 			authMethods:        opts.authMethods(),
+			publicIP:           opts.PublicIP,
 		},
 		logger:  opts.Logger,
 		store:   opts.Store,
@@ -48,7 +50,14 @@ func (s *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	s.setListener(l)
+
+	s.closeListener = func() error {
+		if l == nil {
+			return nil
+		}
+
+		return l.Close()
+	}
 
 	ctx := context.Background()
 
@@ -80,6 +89,7 @@ func (s *Server) Shutdown() error {
 	}
 
 	close(s.active)
+
 	err := s.closeListener()
 
 	<-s.done
@@ -115,15 +125,5 @@ func (s *Server) isActive() bool {
 		return false
 	default:
 		return true
-	}
-}
-
-func (s *Server) setListener(l net.Listener) {
-	s.closeListener = func() error {
-		if l == nil {
-			return nil
-		}
-
-		return l.Close()
 	}
 }

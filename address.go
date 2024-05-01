@@ -3,7 +3,6 @@ package socks5
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 	"net"
 	"strconv"
 )
@@ -33,28 +32,17 @@ func (p port) String() string {
 	return fmt.Sprintf("%d", binary.BigEndian.Uint16(p))
 }
 
-// If s is not a valid, parsePort returns nil.
-func parsePort(s string) port {
-	i, err := strconv.ParseInt(s, 10, 64)
+func (p *port) fromAddress(address net.Addr) {
+	_, port, err := net.SplitHostPort(address.String())
 	if err != nil {
-		return nil
+		return
 	}
 
-	bigInt := big.NewInt(i)
-
-	return bigInt.Bytes()
-}
-
-func equalHosts(first, second string) bool {
-	firstHost, _, err := net.SplitHostPort(first)
+	i, err := strconv.ParseInt(port, 10, 64)
 	if err != nil {
-		return false
+		return
 	}
 
-	secondHost, _, err := net.SplitHostPort(second)
-	if err != nil {
-		return false
-	}
-
-	return firstHost == secondHost
+	*p = make([]byte, 2)
+	binary.BigEndian.PutUint16(*p, uint16(i))
 }

@@ -6,10 +6,10 @@ type Store interface {
 	GetPassword(ctx context.Context, username string) (string, error)
 }
 
-type defaultStore struct {
+type mapStore struct {
 	db map[string]string
 }
 
-func (s defaultStore) GetPassword(ctx context.Context, username string) (string, error) {
+func (s mapStore) GetPassword(ctx context.Context, username string) (string, error) {
 	return s.db[username], nil
 }

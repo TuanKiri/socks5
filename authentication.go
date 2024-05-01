@@ -12,8 +12,8 @@ func (s *Server) choiceAuthenticationMethod(methods []byte) byte {
 	return noAcceptableMethods
 }
 
-func (s *Server) usernamePasswordAuthenticate(ctx context.Context, conn connection) {
-	version, err := conn.ReadByte()
+func (s *Server) usernamePasswordAuthenticate(ctx context.Context, conn *connection) {
+	version, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read authentication version: "+err.Error())
 		return
@@ -23,28 +23,28 @@ func (s *Server) usernamePasswordAuthenticate(ctx context.Context, conn connecti
 		return
 	}
 
-	usernameLen, err := conn.ReadByte()
+	usernameLen, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read username length: "+err.Error())
 		return
 	}
 
 	username := make([]byte, usernameLen)
-	if _, err := conn.Read(username); err != nil {
+	if _, err := conn.read(username); err != nil {
 		s.logger.Error(ctx, "failed to read username: "+err.Error())
 		return
 	}
 
 	ctx = contextWithUsername(ctx, string(username))
 
-	passwordLen, err := conn.ReadByte()
+	passwordLen, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read password length: "+err.Error())
 		return
 	}
 
 	password := make([]byte, passwordLen)
-	if _, err := conn.Read(password); err != nil {
+	if _, err := conn.read(password); err != nil {
 		s.logger.Error(ctx, "failed to read password: "+err.Error())
 		return
 	}

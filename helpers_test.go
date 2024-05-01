@@ -54,11 +54,11 @@ func (d testTLSDriver) Listen() (net.Listener, error) {
 	return tls.Listen("tcp", d.listenAddress, d.tlsConfig)
 }
 
-func (d testTLSDriver) Dial(address string) (net.Conn, error) {
+func (d testTLSDriver) Dial(network, address string) (net.Conn, error) {
 	return tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
 }
 
-func (d testTLSDriver) ListenUDP() (*net.UDPConn, error) {
+func (d testTLSDriver) ListenPacket() (net.PacketConn, error) {
 	return nil, nil
 }
 
