@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/logo.png?raw=true" width="200">
+<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/socks5-assets/blob/master/logo.png?raw=true" width="200">
 
 <h1>SOCKS 5</h1>
 
@@ -18,7 +18,7 @@ A fully featured implementation of the SOCKS 5 protocol in golang.
 | :---: | :---: | :---: |
 | ✅ - implemented | 🛠 - in progress | ✅ - implemented | 
 
-<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/assets/blob/master/socks5/preview.gif?raw=true" width="480">
+<img alt="Gopher socks logo" src="https://github.com/JC5LZiy3HVfV5ux/socks5-assets/blob/master/preview.gif?raw=true" width="480">
 
 </div>
 
@@ -79,7 +79,7 @@ See the [tests](socks5_test.go) for more information about package.
 
 * Why can't connect to socks proxy server?
 
-    Not all applications and browsers support socks authentication or socks protocol. You may need [extension](https://github.com/txthinking/socks5-configurator) for Chrome or another browser.
+    Not all applications and browsers support socks authentication or socks protocol. You may need [extension](https://github.com/txthinking/socks5-configurator) for Chrome or another browser. The proof of work for the UDP association was done using [qBittorrent](https://github.com/qbittorrent/qBittorrent) - a BitTorrent client.
 
 If you have any questions, you can ask in [GitHub Discussions](https://github.com/JC5LZiy3HVfV5ux/socks5/discussions/new?category=q-a).
 
@@ -90,8 +90,6 @@ If you have any questions, you can ask in [GitHub Discussions](https://github.co
 
 ## Licenses
 
-All source code is licensed under the [MIT License](LICENSE).
+* All source code is licensed under the [MIT License](LICENSE).
 
-## Credits
-
-Original gophers design by [@Egon Elbre](https://github.com/egonelbre/gophers).
+* Logo is based on the Go Gopher mascot originally designed by [Egon Elbre](https://github.com/egonelbre/gophers) and which is also licensed under the [CC0 1.0 Universal License](https://creativecommons.org/publicdomain/zero/1.0/).
