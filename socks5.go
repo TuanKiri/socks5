@@ -219,7 +219,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	// While tcp connection is active
 	for conn.isActive() {
-		//  The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes
+		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes
 		packet := make([]byte, 65507)
 
 		n, clientAddress, err := l.ReadFrom(packet)
@@ -244,14 +244,14 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	// Reserved 2 bytes: 0x00, 0x00
 	if _, err := conn.read(make([]byte, 2)); err != nil {
-		s.logger.Error(ctx, "failed to read reserved bytes: "+err.Error())
+		s.logger.Error(ctx, "failed to read reserved bytes from packet: "+err.Error())
 		return
 	}
 
 	// Current fragment number
 	frag, err := conn.readByte()
 	if err != nil {
-		s.logger.Error(ctx, "failed to read current fragment number: "+err.Error())
+		s.logger.Error(ctx, "failed to read current fragment number from packet: "+err.Error())
 		return
 	}
 
@@ -264,7 +264,7 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 
 	addr.Type, err = conn.readByte()
 	if err != nil {
-		s.logger.Error(ctx, "failed to read address type: "+err.Error())
+		s.logger.Error(ctx, "failed to read address type from packet: "+err.Error())
 		return
 	}
 
@@ -272,25 +272,25 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	case addressTypeIPv4:
 		addr.IP = make(net.IP, net.IPv4len)
 		if _, err := conn.read(addr.IP); err != nil {
-			s.logger.Error(ctx, "failed to read IPv4 address: "+err.Error())
+			s.logger.Error(ctx, "failed to read IPv4 address from packet: "+err.Error())
 			return
 		}
 	case addressTypeFQDN:
 		addr.DomainLen, err = conn.readByte()
 		if err != nil {
-			s.logger.Error(ctx, "failed to read domain length: "+err.Error())
+			s.logger.Error(ctx, "failed to read domain length from packet: "+err.Error())
 			return
 		}
 
 		addr.Domain = make([]byte, addr.DomainLen)
 		if _, err := conn.read(addr.Domain); err != nil {
-			s.logger.Error(ctx, "failed to read domain: "+err.Error())
+			s.logger.Error(ctx, "failed to read domain from packet: "+err.Error())
 			return
 		}
 	case addressTypeIPv6:
 		addr.IP = make(net.IP, net.IPv6len)
 		if _, err := conn.read(addr.IP); err != nil {
-			s.logger.Error(ctx, "failed to read IPv6 address: "+err.Error())
+			s.logger.Error(ctx, "failed to read IPv6 address from packet: "+err.Error())
 			return
 		}
 	default:
@@ -299,31 +299,38 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 
 	addr.Port = make([]byte, 2)
 	if _, err := conn.read(addr.Port); err != nil {
-		s.logger.Error(ctx, "failed to read port: "+err.Error())
+		s.logger.Error(ctx, "failed to read port from packet: "+err.Error())
 		return
 	}
 
+	res, err := s.sendPacket(conn.bytes(), &addr)
+	if err != nil {
+		s.logger.Error(ctx, "failed to send packet: "+err.Error())
+		return
+	}
+
+	s.replyPacket(ctx, conn, res, &addr)
+}
+
+func (s *Server) sendPacket(data []byte, addr *address) ([]byte, error) {
 	target, err := s.driver.Dial("udp", addr.String())
 	if err != nil {
-		s.logger.Error(ctx, "dial udp "+addr.String()+": "+err.Error())
-		return
+		return nil, err
 	}
 	defer target.Close()
 
-	if _, err := target.Write(conn.bytes()); err != nil {
-		s.logger.Error(ctx, "failed to write data: "+err.Error())
-		return
+	if _, err := target.Write(data); err != nil {
+		return nil, err
 	}
 
 	packet := make([]byte, 65507)
 
 	n, err := target.Read(packet)
 	if err != nil {
-		s.logger.Error(ctx, "failed to read packet: "+err.Error())
-		return
+		return nil, err
 	}
 
-	s.replyPacket(ctx, conn, packet[:n], &addr)
+	return packet[:n], nil
 }
 
 func (s *Server) replyPacket(ctx context.Context, conn *packetConn, packet []byte, addr *address) {
@@ -397,6 +404,8 @@ func (s *Server) response(ctx context.Context, conn *connection, version, status
 	res = append(res, fields...)
 
 	if _, err := conn.write(res); err != nil {
-		s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
+		if !isClosedListenerError(err) {
+			s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
+		}
 	}
 }
