@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bytes"
 	"context"
 	"net"
 
@@ -221,38 +220,36 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 	// While tcp connection is active
 	for conn.isActive() {
 		//  The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes
-		datagram := make([]byte, 65507)
+		packet := make([]byte, 65507)
 
-		n, remoteAddress, err := l.ReadFrom(datagram)
+		n, clientAddress, err := l.ReadFrom(packet)
 		if err != nil {
 			if !isClosedListenerError(err) {
-				s.logger.Error(ctx, "error read datagram from udp connection: "+err.Error())
+				s.logger.Error(ctx, "error read packet from udp connection: "+err.Error())
 			}
 
 			continue
 		}
 
-		if !conn.equalAddresses(remoteAddress) {
+		if !conn.equalAddresses(clientAddress) {
 			continue
 		}
 
-		go s.serveDatagram(ctx, l, remoteAddress, datagram[:n])
+		go s.servePacketConn(ctx, newPacketConn(l, clientAddress, packet[:n]))
 	}
 
 	s.logger.Info(ctx, "udp datagram forwarding complete")
 }
 
-func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddress net.Addr, data []byte) {
-	buf := bytes.NewBuffer(data)
-
+func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	// Reserved 2 bytes: 0x00, 0x00
-	if _, err := buf.Read(make([]byte, 2)); err != nil {
+	if _, err := conn.read(make([]byte, 2)); err != nil {
 		s.logger.Error(ctx, "failed to read reserved bytes: "+err.Error())
 		return
 	}
 
 	// Current fragment number
-	frag, err := buf.ReadByte()
+	frag, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read current fragment number: "+err.Error())
 		return
@@ -265,7 +262,7 @@ func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddr
 
 	var addr address
 
-	addr.Type, err = buf.ReadByte()
+	addr.Type, err = conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read address type: "+err.Error())
 		return
@@ -274,25 +271,25 @@ func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddr
 	switch addr.Type {
 	case addressTypeIPv4:
 		addr.IP = make(net.IP, net.IPv4len)
-		if _, err := buf.Read(addr.IP); err != nil {
+		if _, err := conn.read(addr.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv4 address: "+err.Error())
 			return
 		}
 	case addressTypeFQDN:
-		addr.DomainLen, err = buf.ReadByte()
+		addr.DomainLen, err = conn.readByte()
 		if err != nil {
 			s.logger.Error(ctx, "failed to read domain length: "+err.Error())
 			return
 		}
 
 		addr.Domain = make([]byte, addr.DomainLen)
-		if _, err := buf.Read(addr.Domain); err != nil {
+		if _, err := conn.read(addr.Domain); err != nil {
 			s.logger.Error(ctx, "failed to read domain: "+err.Error())
 			return
 		}
 	case addressTypeIPv6:
 		addr.IP = make(net.IP, net.IPv6len)
-		if _, err := buf.Read(addr.IP); err != nil {
+		if _, err := conn.read(addr.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv6 address: "+err.Error())
 			return
 		}
@@ -301,7 +298,7 @@ func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddr
 	}
 
 	addr.Port = make([]byte, 2)
-	if _, err := buf.Read(addr.Port); err != nil {
+	if _, err := conn.read(addr.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port: "+err.Error())
 		return
 	}
@@ -313,20 +310,24 @@ func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddr
 	}
 	defer target.Close()
 
-	if _, err := target.Write(buf.Bytes()); err != nil {
+	if _, err := target.Write(conn.bytes()); err != nil {
 		s.logger.Error(ctx, "failed to write data: "+err.Error())
 		return
 	}
 
-	datagram := make([]byte, 65507)
+	packet := make([]byte, 65507)
 
-	n, err := target.Read(datagram)
+	n, err := target.Read(packet)
 	if err != nil {
-		s.logger.Error(ctx, "failed to read datagram: "+err.Error())
+		s.logger.Error(ctx, "failed to read packet: "+err.Error())
 		return
 	}
 
-	response := []byte{
+	s.replyPacket(ctx, conn, packet[:n], &addr)
+}
+
+func (s *Server) replyPacket(ctx context.Context, conn *packetConn, packet []byte, addr *address) {
+	res := []byte{
 		0x00, // Reserved byte
 		0x00, // Reserved byte
 		0x00, // Current fragment number
@@ -335,20 +336,20 @@ func (s *Server) serveDatagram(ctx context.Context, l net.PacketConn, remoteAddr
 
 	switch addr.Type {
 	case addressTypeIPv4:
-		response = append(response, addr.IP.To4()...)
+		res = append(res, addr.IP.To4()...)
 	case addressTypeFQDN:
-		response = append(response, addr.DomainLen)
-		response = append(response, addr.Domain...)
+		res = append(res, addr.DomainLen)
+		res = append(res, addr.Domain...)
 	case addressTypeIPv6:
-		response = append(response, addr.IP.To16()...)
+		res = append(res, addr.IP.To16()...)
 	}
 
-	response = append(response, addr.Port...)
-	response = append(response, datagram[:n]...)
+	res = append(res, addr.Port...)
+	res = append(res, packet...)
 
-	if _, err := l.WriteTo(response, remoteAddress); err != nil {
+	if _, err := conn.write(res); err != nil {
 		if !isClosedListenerError(err) {
-			s.logger.Error(ctx, "error write datagram to udp connection: "+err.Error())
+			s.logger.Error(ctx, "error write packet to udp connection: "+err.Error())
 		}
 	}
 }
