@@ -56,7 +56,7 @@ func (c *connection) equalAddresses(address net.Addr) bool {
 	return currentHost == incomingHost
 }
 
-func (c *connection) onCloseConnection(f func()) {
+func (c *connection) onClose(f func()) {
 	c.closeFn = f
 }
 

@@ -194,7 +194,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 		return
 	}
 
-	conn.onCloseConnection(func() {
+	conn.onClose(func() {
 		if l == nil {
 			return
 		}
