@@ -409,8 +409,6 @@ func (s *Server) response(ctx context.Context, conn *connection, version, status
 	res = append(res, fields...)
 
 	if _, err := conn.write(res); err != nil {
-		if !isClosedListenerError(err) {
-			s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
-		}
+		s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
 	}
 }
