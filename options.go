@@ -2,12 +2,14 @@ package socks5
 
 import (
 	"log"
+	"net"
 	"os"
 	"time"
 )
 
 type Options struct {
 	ListenAddress      string            // default: 127.0.0.1:1080
+	PublicIP           net.IP            // default: 127.0.0.1. Only IPv4 address that is visible to the external connections. Port is assigned automatically.
 	ReadTimeout        time.Duration     // default: none
 	WriteTimeout       time.Duration     // default: none
 	DialTimeout        time.Duration     // default: none
@@ -15,8 +17,8 @@ type Options struct {
 	Authentication     bool              // default: no authentication required
 	StaticCredentials  map[string]string // default: root / password
 	Logger             Logger            // default: stdoutLogger
-	Store              Store             // default: defaultStore
-	Driver             Driver            // default: defaultDriver
+	Store              Store             // default: mapStore
+	Driver             Driver            // default: netDriver
 	Metrics            Metrics           // default: nopMetrics
 }
 
@@ -51,7 +53,7 @@ func optsWithDefaults(opts *Options) *Options {
 			}
 		}
 
-		opts.Store = &defaultStore{
+		opts.Store = &mapStore{
 			db: opts.StaticCredentials,
 		}
 	}
@@ -61,10 +63,20 @@ func optsWithDefaults(opts *Options) *Options {
 			opts.ListenAddress = "127.0.0.1:1080"
 		}
 
-		opts.Driver = &defaultDriver{
+		host, _, err := net.SplitHostPort(opts.ListenAddress)
+		if err != nil {
+			host = "127.0.0.1"
+		}
+
+		opts.Driver = &netDriver{
 			listenAddress: opts.ListenAddress,
+			bindAddress:   host + ":0",
 			dialTimeout:   opts.DialTimeout,
 		}
+	}
+
+	if opts.PublicIP == nil {
+		opts.PublicIP = net.ParseIP("127.0.0.1")
 	}
 
 	if opts.Metrics == nil {

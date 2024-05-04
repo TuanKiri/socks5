@@ -10,7 +10,7 @@ func relay(dst io.Writer, src io.Reader) (int64, error) {
 	n, err := io.Copy(dst, src)
 
 	if writer, ok := dst.(closeWriter); ok {
-		// send EOF for next io.Copy
+		// Send EOF for next io.Copy
 		writer.CloseWrite()
 	}
 

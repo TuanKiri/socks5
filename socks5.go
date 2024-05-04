@@ -1,9 +1,7 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
-	"io"
 	"net"
 
 	"golang.org/x/sync/errgroup"
@@ -24,7 +22,8 @@ const (
 	addressTypeFQDN byte = 0x03
 	addressTypeIPv6 byte = 0x04
 
-	commandConnect byte = 0x01
+	connect      byte = 0x01
+	udpAssociate byte = 0x03
 
 	connectionSuccessful      byte = 0x00
 	generalSOCKSserverFailure byte = 0x01
@@ -35,8 +34,8 @@ const (
 	addressTypeNotSupported   byte = 0x08
 )
 
-func (s *Server) handshake(ctx context.Context, writer io.Writer, reader *bufio.Reader) {
-	version, err := reader.ReadByte()
+func (s *Server) handshake(ctx context.Context, conn *connection) {
+	version, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
 		return
@@ -46,14 +45,14 @@ func (s *Server) handshake(ctx context.Context, writer io.Writer, reader *bufio.
 		return
 	}
 
-	numMethods, err := reader.ReadByte()
+	numMethods, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read number of authentication methods: "+err.Error())
 		return
 	}
 
 	methods := make([]byte, numMethods)
-	if _, err := reader.Read(methods); err != nil {
+	if _, err := conn.read(methods); err != nil {
 		s.logger.Error(ctx, "failed to read authentication methods: "+err.Error())
 		return
 	}
@@ -61,21 +60,21 @@ func (s *Server) handshake(ctx context.Context, writer io.Writer, reader *bufio.
 	method := s.choiceAuthenticationMethod(methods)
 	switch method {
 	case noAuthenticationRequired:
-		s.response(ctx, writer, version5, noAuthenticationRequired)
+		s.response(ctx, conn, version5, noAuthenticationRequired)
 
-		s.acceptRequest(ctx, writer, reader)
+		s.acceptRequest(ctx, conn)
 	case usernamePasswordAuthentication:
-		s.response(ctx, writer, version5, usernamePasswordAuthentication)
+		s.response(ctx, conn, version5, usernamePasswordAuthentication)
 
-		s.usernamePasswordAuthenticate(ctx, writer, reader)
+		s.usernamePasswordAuthenticate(ctx, conn)
 	default:
-		s.response(ctx, writer, version5, noAcceptableMethods)
+		s.response(ctx, conn, version5, noAcceptableMethods)
 		return
 	}
 }
 
-func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bufio.Reader) {
-	version, err := reader.ReadByte()
+func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
+	version, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read protocol version: "+err.Error())
 		return
@@ -85,95 +84,97 @@ func (s *Server) acceptRequest(ctx context.Context, writer io.Writer, reader *bu
 		return
 	}
 
-	command, err := reader.ReadByte()
+	command, err := conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read command: "+err.Error())
 		return
 	}
 
 	// Reserved byte: 0x00
-	if _, err := reader.ReadByte(); err != nil {
+	if _, err := conn.readByte(); err != nil {
 		s.logger.Error(ctx, "failed to read reserved byte: "+err.Error())
 		return
 	}
 
-	var address address
+	var addr address
 
-	address.Type, err = reader.ReadByte()
+	addr.Type, err = conn.readByte()
 	if err != nil {
 		s.logger.Error(ctx, "failed to read address type: "+err.Error())
 		return
 	}
 
-	switch address.Type {
+	switch addr.Type {
 	case addressTypeIPv4:
-		address.IP = make(net.IP, net.IPv4len)
-		if _, err := reader.Read(address.IP); err != nil {
+		addr.IP = make(net.IP, net.IPv4len)
+		if _, err := conn.read(addr.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv4 address: "+err.Error())
 			return
 		}
 	case addressTypeFQDN:
-		address.DomainLen, err = reader.ReadByte()
+		addr.DomainLen, err = conn.readByte()
 		if err != nil {
 			s.logger.Error(ctx, "failed to read domain length: "+err.Error())
 			return
 		}
 
-		address.Domain = make([]byte, address.DomainLen)
-		if _, err := reader.Read(address.Domain); err != nil {
+		addr.Domain = make([]byte, addr.DomainLen)
+		if _, err := conn.read(addr.Domain); err != nil {
 			s.logger.Error(ctx, "failed to read domain: "+err.Error())
 			return
 		}
 	case addressTypeIPv6:
-		address.IP = make(net.IP, net.IPv6len)
-		if _, err := reader.Read(address.IP); err != nil {
+		addr.IP = make(net.IP, net.IPv6len)
+		if _, err := conn.read(addr.IP); err != nil {
 			s.logger.Error(ctx, "failed to read IPv6 address: "+err.Error())
 			return
 		}
 	default:
-		s.replyRequest(ctx, writer, addressTypeNotSupported, &address)
+		s.replyRequest(ctx, conn, addressTypeNotSupported, &addr)
 		return
 	}
 
-	address.Port = make([]byte, 2)
-	if _, err := reader.Read(address.Port); err != nil {
+	addr.Port = make([]byte, 2)
+	if _, err := conn.read(addr.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port: "+err.Error())
 		return
 	}
 
 	switch command {
-	case commandConnect:
-		s.connect(ctx, writer, reader, &address)
+	case connect:
+		s.connect(ctx, conn, &addr)
+	case udpAssociate:
+		s.udpAssociate(ctx, conn, &addr)
 	default:
-		s.replyRequest(ctx, writer, commandNotSupported, &address)
+		s.replyRequest(ctx, conn, commandNotSupported, &addr)
 		return
 	}
 }
 
-func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Reader, address *address) {
-	target, err := s.driver.Dial(address.String())
+func (s *Server) connect(ctx context.Context, conn *connection, addr *address) {
+	target, err := s.driver.Dial("tcp", addr.String())
 	if err != nil {
-		s.replyRequestWithError(ctx, writer, err, address)
+		s.replyRequestWithError(ctx, conn, err, addr)
 
-		s.logger.Error(ctx, "dial "+address.String()+": "+err.Error())
+		s.logger.Error(ctx, "dial "+addr.String()+": "+err.Error())
 		return
 	}
 	defer target.Close()
 
-	s.replyRequest(ctx, writer, connectionSuccessful, address)
+	s.replyRequest(ctx, conn, connectionSuccessful, addr)
 
-	s.logger.Info(ctx, "dial "+address.String())
+	s.logger.Info(ctx, "dial "+addr.String())
 
 	var g errgroup.Group
 
 	g.Go(func() error {
-		n, err := relay(target, reader)
+		n, err := relay(target, conn)
 		s.metrics.UploadBytes(ctx, n)
 		return err
 	})
 
 	g.Go(func() error {
-		n, err := relay(writer, target)
+		n, err := relay(conn, target)
 		s.metrics.DownloadBytes(ctx, n)
 		return err
 	})
@@ -183,41 +184,223 @@ func (s *Server) connect(ctx context.Context, writer io.Writer, reader *bufio.Re
 	}
 }
 
-func (s *Server) replyRequestWithError(ctx context.Context, writer io.Writer, err error, address *address) {
-	switch {
-	case networkUnreachableError(err):
-		s.replyRequest(ctx, writer, networkUnreachable, address)
-	case noSuchHostError(err):
-		s.replyRequest(ctx, writer, hostUnreachable, address)
-	case connectionRefusedError(err):
-		s.replyRequest(ctx, writer, connectionRefused, address)
+func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *address) {
+	l, err := s.driver.ListenPacket()
+	if err != nil {
+		s.replyRequestWithError(ctx, conn, err, addr)
+
+		s.logger.Error(ctx, "error listen udp: "+err.Error())
+		return
+	}
+
+	conn.onClose(func() {
+		if l == nil {
+			return
+		}
+
+		if err := l.Close(); err != nil {
+			s.logger.Error(ctx, "error close udp listener: "+err.Error())
+		}
+	})
+
+	go conn.keepAlive()
+
+	var port port
+
+	port.fromAddress(l.LocalAddr())
+
+	s.replyRequest(ctx, conn, connectionSuccessful, &address{
+		Type: addressTypeIPv4,
+		IP:   s.config.publicIP,
+		Port: port,
+	})
+
+	s.logger.Info(ctx, "start of udp datagram forwarding")
+
+	// While tcp connection is active
+	for conn.isActive() {
+		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes
+		packet := make([]byte, 65507)
+
+		n, clientAddress, err := l.ReadFrom(packet)
+		if err != nil {
+			if !isClosedListenerError(err) {
+				s.logger.Error(ctx, "error read packet from udp connection: "+err.Error())
+			}
+
+			continue
+		}
+
+		if !conn.equalAddresses(clientAddress) {
+			continue
+		}
+
+		go s.servePacketConn(ctx, newPacketConn(l, clientAddress, packet[:n]))
+	}
+
+	s.logger.Info(ctx, "udp datagram forwarding complete")
+}
+
+func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
+	// Reserved 2 bytes: 0x00, 0x00
+	if _, err := conn.read(make([]byte, 2)); err != nil {
+		s.logger.Error(ctx, "failed to read reserved bytes from packet: "+err.Error())
+		return
+	}
+
+	// Current fragment number
+	frag, err := conn.readByte()
+	if err != nil {
+		s.logger.Error(ctx, "failed to read current fragment number from packet: "+err.Error())
+		return
+	}
+
+	// If not support fragmentation must drop any datagram whose FRAG field is other than 0x00
+	if frag != 0x00 {
+		return
+	}
+
+	var addr address
+
+	addr.Type, err = conn.readByte()
+	if err != nil {
+		s.logger.Error(ctx, "failed to read address type from packet: "+err.Error())
+		return
+	}
+
+	switch addr.Type {
+	case addressTypeIPv4:
+		addr.IP = make(net.IP, net.IPv4len)
+		if _, err := conn.read(addr.IP); err != nil {
+			s.logger.Error(ctx, "failed to read IPv4 address from packet: "+err.Error())
+			return
+		}
+	case addressTypeFQDN:
+		addr.DomainLen, err = conn.readByte()
+		if err != nil {
+			s.logger.Error(ctx, "failed to read domain length from packet: "+err.Error())
+			return
+		}
+
+		addr.Domain = make([]byte, addr.DomainLen)
+		if _, err := conn.read(addr.Domain); err != nil {
+			s.logger.Error(ctx, "failed to read domain from packet: "+err.Error())
+			return
+		}
+	case addressTypeIPv6:
+		addr.IP = make(net.IP, net.IPv6len)
+		if _, err := conn.read(addr.IP); err != nil {
+			s.logger.Error(ctx, "failed to read IPv6 address from packet: "+err.Error())
+			return
+		}
 	default:
-		s.replyRequest(ctx, writer, generalSOCKSserverFailure, address)
+		return
+	}
+
+	addr.Port = make([]byte, 2)
+	if _, err := conn.read(addr.Port); err != nil {
+		s.logger.Error(ctx, "failed to read port from packet: "+err.Error())
+		return
+	}
+
+	res, err := s.sendPacket(ctx, conn.bytes(), &addr)
+	if err != nil {
+		s.logger.Error(ctx, "failed to send packet: "+err.Error())
+		return
+	}
+
+	s.replyPacket(ctx, conn, res, &addr)
+}
+
+func (s *Server) sendPacket(ctx context.Context, data []byte, addr *address) ([]byte, error) {
+	target, err := s.driver.Dial("udp", addr.String())
+	if err != nil {
+		return nil, err
+	}
+	defer target.Close()
+
+	n, err := target.Write(data)
+	if err != nil {
+		return nil, err
+	}
+
+	s.metrics.UploadBytes(ctx, int64(n))
+
+	packet := make([]byte, 65507)
+
+	n, err = target.Read(packet)
+	if err != nil {
+		return nil, err
+	}
+
+	s.metrics.DownloadBytes(ctx, int64(n))
+
+	return packet[:n], nil
+}
+
+func (s *Server) replyPacket(ctx context.Context, conn *packetConn, packet []byte, addr *address) {
+	res := []byte{
+		0x00, // Reserved byte
+		0x00, // Reserved byte
+		0x00, // Current fragment number
+		addr.Type,
+	}
+
+	switch addr.Type {
+	case addressTypeIPv4:
+		res = append(res, addr.IP.To4()...)
+	case addressTypeFQDN:
+		res = append(res, addr.DomainLen)
+		res = append(res, addr.Domain...)
+	case addressTypeIPv6:
+		res = append(res, addr.IP.To16()...)
+	}
+
+	res = append(res, addr.Port...)
+	res = append(res, packet...)
+
+	if _, err := conn.write(res); err != nil {
+		if !isClosedListenerError(err) {
+			s.logger.Error(ctx, "error write packet to udp connection: "+err.Error())
+		}
 	}
 }
 
-func (s *Server) replyRequest(ctx context.Context, writer io.Writer, status byte, address *address) {
+func (s *Server) replyRequestWithError(ctx context.Context, conn *connection, err error, addr *address) {
+	switch {
+	case isNetworkUnreachableError(err):
+		s.replyRequest(ctx, conn, networkUnreachable, addr)
+	case isNoSuchHostError(err):
+		s.replyRequest(ctx, conn, hostUnreachable, addr)
+	case isConnectionRefusedError(err):
+		s.replyRequest(ctx, conn, connectionRefused, addr)
+	default:
+		s.replyRequest(ctx, conn, generalSOCKSserverFailure, addr)
+	}
+}
+
+func (s *Server) replyRequest(ctx context.Context, conn *connection, status byte, addr *address) {
 	fields := []byte{
 		0x00, // Reserved byte
-		address.Type,
+		addr.Type,
 	}
 
-	switch address.Type {
+	switch addr.Type {
 	case addressTypeIPv4:
-		fields = append(fields, address.IP.To4()...)
-	case addressTypeIPv6:
-		fields = append(fields, address.IP.To16()...)
+		fields = append(fields, addr.IP.To4()...)
 	case addressTypeFQDN:
-		fields = append(fields, address.DomainLen)
-		fields = append(fields, address.Domain...)
+		fields = append(fields, addr.DomainLen)
+		fields = append(fields, addr.Domain...)
+	case addressTypeIPv6:
+		fields = append(fields, addr.IP.To16()...)
 	}
 
-	fields = append(fields, address.Port...)
+	fields = append(fields, addr.Port...)
 
-	s.response(ctx, writer, version5, status, fields...)
+	s.response(ctx, conn, version5, status, fields...)
 }
 
-func (s *Server) response(ctx context.Context, writer io.Writer, version, status byte, fields ...byte) {
+func (s *Server) response(ctx context.Context, conn *connection, version, status byte, fields ...byte) {
 	res := []byte{
 		version,
 		status,
@@ -225,7 +408,7 @@ func (s *Server) response(ctx context.Context, writer io.Writer, version, status
 
 	res = append(res, fields...)
 
-	if _, err := writer.Write(res); err != nil {
+	if _, err := conn.write(res); err != nil {
 		s.logger.Error(ctx, "failed to send a response to the client: "+err.Error())
 	}
 }

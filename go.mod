@@ -1,11 +1,11 @@
 module github.com/JC5LZiy3HVfV5ux/socks5
 
-go 1.18
+go 1.22
 
 require (
-	github.com/stretchr/testify v1.8.4
-	golang.org/x/net v0.2.0
-	golang.org/x/sync v0.6.0
+	github.com/stretchr/testify v1.9.0
+	golang.org/x/net v0.24.0
+	golang.org/x/sync v0.7.0
 )
 
 require (

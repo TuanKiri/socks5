@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"net"
 	"time"
@@ -12,6 +11,7 @@ type config struct {
 	writeTimeout       time.Duration
 	getPasswordTimeout time.Duration
 	authMethods        map[byte]struct{}
+	publicIP           net.IP
 }
 
 type Server struct {
@@ -34,6 +34,7 @@ func New(opts *Options) *Server {
 			writeTimeout:       opts.WriteTimeout,
 			getPasswordTimeout: opts.GetPasswordTimeout,
 			authMethods:        opts.authMethods(),
+			publicIP:           opts.PublicIP,
 		},
 		logger:  opts.Logger,
 		store:   opts.Store,
@@ -49,7 +50,14 @@ func (s *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	s.setListener(l)
+
+	s.closeListener = func() error {
+		if l == nil {
+			return nil
+		}
+
+		return l.Close()
+	}
 
 	ctx := context.Background()
 
@@ -58,7 +66,7 @@ func (s *Server) ListenAndServe() error {
 	for s.isActive() {
 		conn, err := l.Accept()
 		if err != nil {
-			if !closedListenerError(err) {
+			if !isClosedListenerError(err) {
 				s.logger.Error(ctx, "failed to accept connection: "+err.Error())
 			}
 
@@ -81,6 +89,7 @@ func (s *Server) Shutdown() error {
 	}
 
 	close(s.active)
+
 	err := s.closeListener()
 
 	<-s.done
@@ -93,10 +102,9 @@ func (s *Server) serve(conn net.Conn) {
 
 	s.setConnDeadline(conn)
 
-	reader := bufio.NewReader(conn)
 	ctx := contextWithRemoteAddress(context.Background(), conn.RemoteAddr().String())
 
-	s.handshake(ctx, conn, reader)
+	s.handshake(ctx, newConnection(conn))
 }
 
 func (s *Server) setConnDeadline(conn net.Conn) {
@@ -117,15 +125,5 @@ func (s *Server) isActive() bool {
 		return false
 	default:
 		return true
-	}
-}
-
-func (s *Server) setListener(l net.Listener) {
-	s.closeListener = func() error {
-		if l == nil {
-			return nil
-		}
-
-		return l.Close()
 	}
 }
