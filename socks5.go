@@ -303,7 +303,7 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 		return
 	}
 
-	res, err := s.sendPacket(conn.bytes(), &addr)
+	res, err := s.sendPacket(ctx, conn.bytes(), &addr)
 	if err != nil {
 		s.logger.Error(ctx, "failed to send packet: "+err.Error())
 		return
@@ -312,23 +312,28 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	s.replyPacket(ctx, conn, res, &addr)
 }
 
-func (s *Server) sendPacket(data []byte, addr *address) ([]byte, error) {
+func (s *Server) sendPacket(ctx context.Context, data []byte, addr *address) ([]byte, error) {
 	target, err := s.driver.Dial("udp", addr.String())
 	if err != nil {
 		return nil, err
 	}
 	defer target.Close()
 
-	if _, err := target.Write(data); err != nil {
-		return nil, err
-	}
-
-	packet := make([]byte, 65507)
-
-	n, err := target.Read(packet)
+	n, err := target.Write(data)
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.UploadBytes(ctx, int64(n))
+
+	packet := make([]byte, 65507)
+
+	n, err = target.Read(packet)
+	if err != nil {
+		return nil, err
+	}
+
+	s.metrics.DownloadBytes(ctx, int64(n))
 
 	return packet[:n], nil
 }
