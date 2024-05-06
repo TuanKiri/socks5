@@ -39,6 +39,16 @@ lPQTC4uW7AAywREZ2ekd8XUX8JwdTJHmPg==
 -----END EC PRIVATE KEY-----
 `
 
+var cert tls.Certificate
+
+func init() {
+	c, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
+	if err != nil {
+		panic(err)
+	}
+	cert = c
+}
+
 type testTLSDial struct{}
 
 func (p testTLSDial) Dial(network, address string) (c net.Conn, err error) {
@@ -46,19 +56,18 @@ func (p testTLSDial) Dial(network, address string) (c net.Conn, err error) {
 }
 
 type testTLSDriver struct {
-	listenAddress string
-	tlsConfig     *tls.Config
+	tlsConfig *tls.Config
 }
 
-func (d testTLSDriver) Listen() (net.Listener, error) {
-	return tls.Listen("tcp", d.listenAddress, d.tlsConfig)
+func (d testTLSDriver) Listen(network, address string) (net.Listener, error) {
+	return tls.Listen(network, address, d.tlsConfig)
 }
 
 func (d testTLSDriver) Dial(network, address string) (net.Conn, error) {
-	return tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true})
+	return tls.Dial(network, address, &tls.Config{InsecureSkipVerify: true})
 }
 
-func (d testTLSDriver) ListenPacket() (net.PacketConn, error) {
+func (d testTLSDriver) ListenPacket(network, address string) (net.PacketConn, error) {
 	return nil, nil
 }
 
@@ -86,11 +95,6 @@ func runRemoteServer(address string, useTLS bool) {
 }
 
 func listenAndServeTLS(address string, handler http.Handler) error {
-	cert, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
-	if err != nil {
-		return err
-	}
-
 	server := http.Server{
 		Addr: address,
 		TLSConfig: &tls.Config{
@@ -102,22 +106,8 @@ func listenAndServeTLS(address string, handler http.Handler) error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func runProxy(opts *socks5.Options, useTLS bool) {
-	if useTLS {
-		cert, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
-		if err != nil {
-			log.Fatalf("runProxy: %v", err)
-		}
-
-		opts.Driver = &testTLSDriver{
-			listenAddress: opts.ListenAddress,
-			tlsConfig: &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			},
-		}
-	}
-
-	srv := socks5.New(opts)
+func runProxy(opts []socks5.Option) {
+	srv := socks5.New(opts...)
 
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("runProxy: %v", err)

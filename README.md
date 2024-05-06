@@ -34,7 +34,10 @@ Create your `.go` file. For example: `main.go`.
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
 
 	"github.com/JC5LZiy3HVfV5ux/socks5"
 )
@@ -43,15 +46,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	// Options allowed as nil. Example options: 
-	// &socks5.Options{
-	//     Authentication: true,
-	//     ListenAddress:  "0.0.0.0:1080",
-	// }
-	srv := socks5.New(nil)
+	srv := socks5.New()
 
 	go func() {
-		// Default address: 127.0.0.1:1080
 		if err := srv.ListenAndServe(); err != nil {
 			log.Fatal(err)
 		}

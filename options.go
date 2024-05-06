@@ -7,26 +7,29 @@ import (
 	"time"
 )
 
-type Options struct {
-	ListenAddress      string            // default: 127.0.0.1:1080
-	PublicIP           net.IP            // default: 127.0.0.1. Only IPv4 address that is visible to the external connections. Port is assigned automatically.
-	ReadTimeout        time.Duration     // default: none
-	WriteTimeout       time.Duration     // default: none
-	DialTimeout        time.Duration     // default: none
-	GetPasswordTimeout time.Duration     // default: none
-	Authentication     bool              // default: no authentication required
-	StaticCredentials  map[string]string // default: root / password
-	Logger             Logger            // default: stdoutLogger
-	Store              Store             // default: mapStore
-	Driver             Driver            // default: netDriver
-	Metrics            Metrics           // default: nopMetrics
+type Option func(*options)
+
+type options struct {
+	host                   string
+	port                   int
+	publicIP               net.IP
+	readTimeout            time.Duration
+	writeTimeout           time.Duration
+	dialTimeout            time.Duration
+	getPasswordTimeout     time.Duration
+	passwordAuthentication bool
+	staticCredentials      map[string]string
+	logger                 Logger
+	store                  Store
+	driver                 Driver
+	metrics                Metrics
 }
 
-func (o Options) authMethods() map[byte]struct{} {
+func (o options) authMethods() map[byte]struct{} {
 	methods := make(map[byte]struct{})
 
 	switch {
-	case o.Authentication:
+	case o.passwordAuthentication:
 		methods[usernamePasswordAuthentication] = struct{}{}
 	default:
 		methods[noAuthenticationRequired] = struct{}{}
@@ -35,53 +38,116 @@ func (o Options) authMethods() map[byte]struct{} {
 	return methods
 }
 
-func optsWithDefaults(opts *Options) *Options {
-	if opts == nil {
-		opts = &Options{}
-	}
-
-	if opts.Logger == nil {
-		opts.Logger = &stdoutLogger{
+func optsWithDefaults(opts *options) *options {
+	if opts.logger == nil {
+		opts.logger = &stdoutLogger{
 			log: log.New(os.Stdout, "[socks5] - ", log.Ldate|log.Ltime),
 		}
 	}
 
-	if opts.Store == nil {
-		if opts.StaticCredentials == nil {
-			opts.StaticCredentials = map[string]string{
+	if opts.store == nil {
+		if opts.staticCredentials == nil {
+			opts.staticCredentials = map[string]string{
 				"root": "password",
 			}
 		}
 
-		opts.Store = &mapStore{
-			db: opts.StaticCredentials,
+		opts.store = &mapStore{
+			db: opts.staticCredentials,
 		}
 	}
 
-	if opts.Driver == nil {
-		if opts.ListenAddress == "" {
-			opts.ListenAddress = "127.0.0.1:1080"
-		}
-
-		host, _, err := net.SplitHostPort(opts.ListenAddress)
-		if err != nil {
-			host = "127.0.0.1"
-		}
-
-		opts.Driver = &netDriver{
-			listenAddress: opts.ListenAddress,
-			bindAddress:   host + ":0",
-			dialTimeout:   opts.DialTimeout,
+	if opts.driver == nil {
+		opts.driver = &netDriver{
+			timeout: opts.dialTimeout,
 		}
 	}
 
-	if opts.PublicIP == nil {
-		opts.PublicIP = net.ParseIP("127.0.0.1")
+	if opts.publicIP == nil {
+		opts.publicIP = net.ParseIP("127.0.0.1")
 	}
 
-	if opts.Metrics == nil {
-		opts.Metrics = &nopMetrics{}
+	if opts.metrics == nil {
+		opts.metrics = &nopMetrics{}
 	}
 
 	return opts
+}
+
+func WithHost(val string) Option {
+	return func(o *options) {
+		o.host = val
+	}
+}
+
+func WithPort(val int) Option {
+	return func(o *options) {
+		o.port = val
+	}
+}
+
+func WithPublicIP(val net.IP) Option {
+	return func(o *options) {
+		o.publicIP = val
+	}
+}
+
+func WithReadTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.readTimeout = val
+	}
+}
+
+func WithWriteTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.writeTimeout = val
+	}
+}
+
+func WithDialTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.dialTimeout = val
+	}
+}
+
+func WithGetPasswordTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.getPasswordTimeout = val
+	}
+}
+
+func WithPasswordAuthentication() Option {
+	return func(o *options) {
+		o.passwordAuthentication = true
+	}
+}
+
+func WithStaticCredentials(val map[string]string) Option {
+	return func(o *options) {
+		o.staticCredentials = val
+	}
+}
+
+func WithLogger(val Logger) Option {
+	return func(o *options) {
+		o.logger = val
+	}
+}
+
+func WithStore(val Store) Option {
+	return func(o *options) {
+		o.store = val
+	}
+}
+
+func WithDriver(val Driver) Option {
+	return func(o *options) {
+		o.driver = val
+	}
+}
+
+func WithMetrics(val Metrics) Option {
+	return func(o *options) {
+		o.metrics = val
+	}
 }
