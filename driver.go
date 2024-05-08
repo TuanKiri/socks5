@@ -6,25 +6,23 @@ import (
 )
 
 type Driver interface {
-	Listen() (net.Listener, error)
-	ListenPacket() (net.PacketConn, error)
+	Listen(network, address string) (net.Listener, error)
+	ListenPacket(network, address string) (net.PacketConn, error)
 	Dial(network, address string) (net.Conn, error)
 }
 
 type netDriver struct {
-	listenAddress string
-	bindAddress   string
-	dialTimeout   time.Duration
+	timeout time.Duration
 }
 
-func (d *netDriver) Listen() (net.Listener, error) {
-	return net.Listen("tcp", d.listenAddress)
+func (d *netDriver) Listen(network, address string) (net.Listener, error) {
+	return net.Listen(network, address)
 }
 
-func (d *netDriver) ListenPacket() (net.PacketConn, error) {
-	return net.ListenPacket("udp", d.bindAddress)
+func (d *netDriver) ListenPacket(network, address string) (net.PacketConn, error) {
+	return net.ListenPacket(network, address)
 }
 
 func (d *netDriver) Dial(network, address string) (net.Conn, error) {
-	return net.DialTimeout(network, address, d.dialTimeout)
+	return net.DialTimeout(network, address, d.timeout)
 }

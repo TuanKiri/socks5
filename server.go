@@ -7,6 +7,8 @@ import (
 )
 
 type config struct {
+	host               string
+	address            string
 	readTimeout        time.Duration
 	writeTimeout       time.Duration
 	getPasswordTimeout time.Duration
@@ -25,39 +27,41 @@ type Server struct {
 	closeListener func() error
 }
 
-func New(opts *Options) *Server {
-	opts = optsWithDefaults(opts)
+func New(opts ...Option) *Server {
+	options := &options{}
+
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	options = optsWithDefaults(options)
 
 	return &Server{
 		config: &config{
-			readTimeout:        opts.ReadTimeout,
-			writeTimeout:       opts.WriteTimeout,
-			getPasswordTimeout: opts.GetPasswordTimeout,
-			authMethods:        opts.authMethods(),
-			publicIP:           opts.PublicIP,
+			host:               options.host,
+			address:            options.listenAddress(),
+			readTimeout:        options.readTimeout,
+			writeTimeout:       options.writeTimeout,
+			getPasswordTimeout: options.getPasswordTimeout,
+			authMethods:        options.authMethods(),
+			publicIP:           options.publicIP,
 		},
-		logger:  opts.Logger,
-		store:   opts.Store,
-		driver:  opts.Driver,
-		metrics: opts.Metrics,
+		logger:  options.logger,
+		store:   options.store,
+		driver:  options.driver,
+		metrics: options.metrics,
 		active:  make(chan struct{}),
 		done:    make(chan struct{}),
 	}
 }
 
 func (s *Server) ListenAndServe() error {
-	l, err := s.driver.Listen()
+	l, err := s.driver.Listen("tcp", s.config.address)
 	if err != nil {
 		return err
 	}
 
-	s.closeListener = func() error {
-		if l == nil {
-			return nil
-		}
-
-		return l.Close()
-	}
+	s.closeListener = closeListenerFn(l)
 
 	ctx := context.Background()
 
@@ -125,5 +129,15 @@ func (s *Server) isActive() bool {
 		return false
 	default:
 		return true
+	}
+}
+
+func closeListenerFn(l net.Listener) func() error {
+	return func() error {
+		if l == nil {
+			return nil
+		}
+
+		return l.Close()
 	}
 }

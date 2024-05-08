@@ -1,6 +1,7 @@
 package socks5_test
 
 import (
+	"crypto/tls"
 	"io"
 	"testing"
 	"time"
@@ -16,130 +17,126 @@ func TestProxyConnect(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		RemoteServerAddress string
-		ProxyAddress        string
-		ProxyOpts           *socks5.Options
-		DestinationUrl      string
-		ClientCredentials   *proxy.Auth
-		UseTLS              bool
-		Wait                []byte
-		Error               string
+		proxyAddress      string
+		proxyOpts         []socks5.Option
+		destinationUrl    string
+		clientCredentials *proxy.Auth
+		wait              []byte
+		errString         string
 	}{
 		"IPv4_address": {
-			RemoteServerAddress: "127.0.0.1:9451",
-			ProxyAddress:        "127.0.0.1:1151",
-			ProxyOpts: &socks5.Options{
-				Logger:        socks5.NopLogger,
-				ListenAddress: "127.0.0.1:1151",
+			proxyAddress: "127.0.0.1:1151",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1151),
 			},
-			DestinationUrl: "http://127.0.0.1:9451/ping",
-			Wait:           []byte("pong!"),
+			destinationUrl: "http://127.0.0.1:5444/ping",
+			wait:           []byte("pong!"),
 		},
 		"FQDN_address": {
-			RemoteServerAddress: "localhost:9452",
-			ProxyAddress:        "127.0.0.1:1152",
-			ProxyOpts: &socks5.Options{
-				Logger:        socks5.NopLogger,
-				ListenAddress: "127.0.0.1:1152",
+			proxyAddress: "127.0.0.1:1152",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1152),
 			},
-			DestinationUrl: "http://localhost:9452/ping",
-			Wait:           []byte("pong!"),
+			destinationUrl: "http://localhost:5444/ping",
+			wait:           []byte("pong!"),
 		},
 		"authenticate_by_username_password": {
-			RemoteServerAddress: "127.0.0.1:9453",
-			ProxyAddress:        "127.0.0.1:1153",
-			ProxyOpts: &socks5.Options{
-				Logger:         socks5.NopLogger,
-				Authentication: true,
-				ListenAddress:  "127.0.0.1:1153",
+			proxyAddress: "127.0.0.1:1153",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1153),
+				socks5.WithPasswordAuthentication(),
 			},
-			DestinationUrl: "http://localhost:9453/ping",
-			ClientCredentials: &proxy.Auth{
+			destinationUrl: "http://localhost:5444/ping",
+			clientCredentials: &proxy.Auth{
 				User:     "root",
 				Password: "password",
 			},
-			Wait: []byte("pong!"),
+			wait: []byte("pong!"),
 		},
 		"wrong_authenticate_by_username_password": {
-			ProxyAddress: "127.0.0.1:1154",
-			ProxyOpts: &socks5.Options{
-				Logger: socks5.NopLogger,
-				StaticCredentials: map[string]string{
+			proxyAddress: "127.0.0.1:1154",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1154),
+				socks5.WithPasswordAuthentication(),
+				socks5.WithStaticCredentials(map[string]string{
 					"root": "password123",
-				},
-				Authentication: true,
-				ListenAddress:  "127.0.0.1:1154",
+				}),
 			},
-			DestinationUrl: "http://localhost:9454",
-			ClientCredentials: &proxy.Auth{
+			destinationUrl: "http://localhost:5444",
+			clientCredentials: &proxy.Auth{
 				User:     "root",
 				Password: "password",
 			},
-			Error: "Get \"http://localhost:9454\": socks connect " +
-				"tcp 127.0.0.1:1154->localhost:9454: username/password authentication failed",
+			errString: "Get \"http://localhost:5444\": socks connect " +
+				"tcp 127.0.0.1:1154->localhost:5444: username/password authentication failed",
 		},
 		"over_tls": {
-			RemoteServerAddress: "127.0.0.1:9455",
-			ProxyAddress:        "127.0.0.1:1155",
-			ProxyOpts: &socks5.Options{
-				Logger:         socks5.NopLogger,
-				Authentication: true,
-				ListenAddress:  "127.0.0.1:1155",
+			proxyAddress: "127.0.0.1:1155",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1155),
+				socks5.WithPasswordAuthentication(),
+				socks5.WithDriver(&testTLSDriver{
+					tlsConfig: &tls.Config{
+						Certificates: []tls.Certificate{cert},
+					},
+				}),
 			},
-			UseTLS:         true,
-			DestinationUrl: "https://localhost:9455/ping",
-			ClientCredentials: &proxy.Auth{
+			destinationUrl: "https://localhost:6444/ping",
+			clientCredentials: &proxy.Auth{
 				User:     "root",
 				Password: "password",
 			},
-			Wait: []byte("pong!"),
+			wait: []byte("pong!"),
 		},
 		"connection_refused": {
-			ProxyAddress: "127.0.0.1:1156",
-			ProxyOpts: &socks5.Options{
-				Logger:        socks5.NopLogger,
-				ListenAddress: "127.0.0.1:1156",
+			proxyAddress: "127.0.0.1:1156",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1156),
 			},
-			DestinationUrl: "http://localhost:4000",
-			Error: "Get \"http://localhost:4000\": socks connect " +
+			destinationUrl: "http://localhost:4000",
+			errString: "Get \"http://localhost:4000\": socks connect " +
 				"tcp 127.0.0.1:1156->localhost:4000: unknown error connection refused",
 		},
 		"IPv6_address": {
-			RemoteServerAddress: "[::1]:9457",
-			ProxyAddress:        "127.0.0.1:1157",
-			ProxyOpts: &socks5.Options{
-				Logger:        socks5.NopLogger,
-				ListenAddress: "127.0.0.1:1157",
+			proxyAddress: "127.0.0.1:1157",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1157),
 			},
-			DestinationUrl: "http://[::1]:9457/ping",
-			Wait:           []byte("pong!"),
+			destinationUrl: "http://[::1]:5444/ping",
+			wait:           []byte("pong!"),
 		},
 		"host_unreachable": {
-			ProxyAddress: "127.0.0.1:1158",
-			ProxyOpts: &socks5.Options{
-				Logger:        socks5.NopLogger,
-				ListenAddress: "127.0.0.1:1158",
+			proxyAddress: "127.0.0.1:1158",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1158),
 			},
-			DestinationUrl: "http://no_such_host.test",
-			Error: "Get \"http://no_such_host.test\": socks connect " +
+			destinationUrl: "http://no_such_host.test",
+			errString: "Get \"http://no_such_host.test\": socks connect " +
 				"tcp 127.0.0.1:1158->no_such_host.test:80: unknown error host unreachable",
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			go runRemoteServer(tc.RemoteServerAddress, tc.UseTLS)
-			go runProxy(tc.ProxyOpts, tc.UseTLS)
+			go runProxy(tc.proxyOpts)
 
 			// Wait for socks5 proxy to start
 			time.Sleep(100 * time.Millisecond)
 
-			client, err := setupClient(tc.ProxyAddress, tc.ClientCredentials)
+			client, err := setupClient(tc.proxyAddress, tc.clientCredentials)
 			assert.NoError(t, err)
 
-			resp, err := client.Get(tc.DestinationUrl)
+			resp, err := client.Get(tc.destinationUrl)
 			if err != nil {
-				require.EqualError(t, err, tc.Error)
+				require.EqualError(t, err, tc.errString)
 				return
 			}
 			defer resp.Body.Close()
@@ -147,7 +144,7 @@ func TestProxyConnect(t *testing.T) {
 			body, err := io.ReadAll(resp.Body)
 			assert.NoError(t, err)
 
-			require.Equal(t, tc.Wait, body)
+			require.Equal(t, tc.wait, body)
 		})
 	}
 }

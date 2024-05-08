@@ -185,7 +185,7 @@ func (s *Server) connect(ctx context.Context, conn *connection, addr *address) {
 }
 
 func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *address) {
-	l, err := s.driver.ListenPacket()
+	l, err := s.driver.ListenPacket("udp", net.JoinHostPort(s.config.host, "0"))
 	if err != nil {
 		s.replyRequestWithError(ctx, conn, err, addr)
 
