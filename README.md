@@ -76,9 +76,13 @@ See the [tests](socks5_test.go) for more information about package.
 
 * Why can't connect to socks proxy server?
 
-    Not all applications and browsers support socks authentication or socks protocol. You may need [extension](https://github.com/txthinking/socks5-configurator) for Chrome or another browser. The proof of work for the UDP association was done using [qBittorrent](https://github.com/qbittorrent/qBittorrent) - a BitTorrent client.
+    Not all applications and browsers support socks authentication or socks protocol. You may need [extension](https://github.com/txthinking/socks5-configurator) for Chrome or another browser.
 
 If you have any questions, you can ask in [GitHub Discussions](https://github.com/JC5LZiy3HVfV5ux/socks5/discussions/new?category=q-a).
+
+## Note
+
+* The proof of work for the UDP association was done using [qBittorrent](https://github.com/qbittorrent/qBittorrent) - a BitTorrent client.
 
 ## References
 
