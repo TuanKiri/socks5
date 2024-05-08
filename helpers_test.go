@@ -47,6 +47,24 @@ func init() {
 		panic(err)
 	}
 	cert = c
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "pong!")
+	})
+
+	go func() {
+		if err := http.ListenAndServe(":5444", mux); err != nil {
+			log.Fatalf("runRemoteServer: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := listenAndServeTLS(":6444", mux); err != nil {
+			log.Fatalf("runRemoteServer: %v", err)
+		}
+	}()
 }
 
 type testTLSDial struct{}
@@ -69,29 +87,6 @@ func (d testTLSDriver) Dial(network, address string) (net.Conn, error) {
 
 func (d testTLSDriver) ListenPacket(network, address string) (net.PacketConn, error) {
 	return nil, nil
-}
-
-func runRemoteServer(address string, useTLS bool) {
-	if address == "" {
-		return
-	}
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "pong!")
-	})
-
-	if useTLS {
-		if err := listenAndServeTLS(address, mux); err != nil {
-			log.Fatalf("runRemoteServer: %v", err)
-		}
-		return
-	}
-
-	if err := http.ListenAndServe(address, mux); err != nil {
-		log.Fatalf("runRemoteServer: %v", err)
-	}
 }
 
 func listenAndServeTLS(address string, handler http.Handler) error {

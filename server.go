@@ -2,7 +2,6 @@ package socks5
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 )
@@ -40,7 +39,7 @@ func New(opts ...Option) *Server {
 	return &Server{
 		config: &config{
 			host:               options.host,
-			address:            fmt.Sprintf("%s:%d", options.host, options.port),
+			address:            options.listenAddress(),
 			readTimeout:        options.readTimeout,
 			writeTimeout:       options.writeTimeout,
 			getPasswordTimeout: options.getPasswordTimeout,
@@ -62,13 +61,7 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 
-	s.closeListener = func() error {
-		if l == nil {
-			return nil
-		}
-
-		return l.Close()
-	}
+	s.closeListener = closeListenerFn(l)
 
 	ctx := context.Background()
 
@@ -136,5 +129,15 @@ func (s *Server) isActive() bool {
 		return false
 	default:
 		return true
+	}
+}
+
+func closeListenerFn(l net.Listener) func() error {
+	return func() error {
+		if l == nil {
+			return nil
+		}
+
+		return l.Close()
 	}
 }

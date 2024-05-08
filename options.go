@@ -1,6 +1,7 @@
 package socks5
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -38,7 +39,19 @@ func (o options) authMethods() map[byte]struct{} {
 	return methods
 }
 
+func (o options) listenAddress() string {
+	return fmt.Sprintf("%s:%d", o.host, o.port)
+}
+
 func optsWithDefaults(opts *options) *options {
+	if opts.port == 0 {
+		opts.port = 1080
+	}
+
+	if opts.publicIP == nil {
+		opts.publicIP = net.ParseIP("127.0.0.1")
+	}
+
 	if opts.logger == nil {
 		opts.logger = &stdoutLogger{
 			log: log.New(os.Stdout, "[socks5] - ", log.Ldate|log.Ltime),
@@ -61,10 +74,6 @@ func optsWithDefaults(opts *options) *options {
 		opts.driver = &netDriver{
 			timeout: opts.dialTimeout,
 		}
-	}
-
-	if opts.publicIP == nil {
-		opts.publicIP = net.ParseIP("127.0.0.1")
 	}
 
 	if opts.metrics == nil {
