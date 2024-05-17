@@ -22,7 +22,7 @@ func contextWithUsername(ctx context.Context, username string) context.Context {
 	return context.WithValue(ctx, usernameKey, username)
 }
 
-func UsernameFromContext(ctx context.Context, username string) (string, bool) {
+func UsernameFromContext(ctx context.Context) (string, bool) {
 	value, ok := ctx.Value(usernameKey).(string)
 	return value, ok
 }
