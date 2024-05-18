@@ -22,6 +22,7 @@ type Server struct {
 	store         Store
 	driver        Driver
 	metrics       Metrics
+	rules         RuleSet
 	active        chan struct{}
 	done          chan struct{}
 	closeListener func() error

@@ -25,13 +25,14 @@ const (
 	connect      byte = 0x01
 	udpAssociate byte = 0x03
 
-	connectionSuccessful      byte = 0x00
-	generalSOCKSserverFailure byte = 0x01
-	networkUnreachable        byte = 0x03
-	hostUnreachable           byte = 0x04
-	connectionRefused         byte = 0x05
-	commandNotSupported       byte = 0x07
-	addressTypeNotSupported   byte = 0x08
+	connectionSuccessful          byte = 0x00
+	generalSOCKSserverFailure     byte = 0x01
+	connectionNotAllowedByRuleSet byte = 0x02
+	networkUnreachable            byte = 0x03
+	hostUnreachable               byte = 0x04
+	connectionRefused             byte = 0x05
+	commandNotSupported           byte = 0x07
+	addressTypeNotSupported       byte = 0x08
 )
 
 func (s *Server) handshake(ctx context.Context, conn *connection) {
@@ -69,7 +70,6 @@ func (s *Server) handshake(ctx context.Context, conn *connection) {
 		s.usernamePasswordAuthenticate(ctx, conn)
 	default:
 		s.response(ctx, conn, version5, noAcceptableMethods)
-		return
 	}
 }
 
@@ -142,12 +142,21 @@ func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
 
 	switch command {
 	case connect:
+		if !s.rules.AllowCommand(ctx, connect) {
+			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+			return
+		}
+
 		s.connect(ctx, conn, &addr)
 	case udpAssociate:
+		if !s.rules.AllowCommand(ctx, udpAssociate) {
+			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+			return
+		}
+
 		s.udpAssociate(ctx, conn, &addr)
 	default:
 		s.replyRequest(ctx, conn, commandNotSupported, &addr)
-		return
 	}
 }
 
