@@ -79,7 +79,6 @@ func TestProxyConnect(t *testing.T) {
 			proxyOpts: []socks5.Option{
 				socks5.WithLogger(socks5.NopLogger),
 				socks5.WithPort(1155),
-				socks5.WithPasswordAuthentication(),
 				socks5.WithDriver(&testTLSDriver{
 					tlsConfig: &tls.Config{
 						Certificates: []tls.Certificate{cert},
@@ -87,11 +86,7 @@ func TestProxyConnect(t *testing.T) {
 				}),
 			},
 			destinationUrl: "https://localhost:6444/ping",
-			clientCredentials: &proxy.Auth{
-				User:     "root",
-				Password: "password",
-			},
-			wait: []byte("pong!"),
+			wait:           []byte("pong!"),
 		},
 		"connection_refused": {
 			proxyAddress: "127.0.0.1:1156",
@@ -121,6 +116,17 @@ func TestProxyConnect(t *testing.T) {
 			destinationUrl: "http://no_such_host.test",
 			errString: "Get \"http://no_such_host.test\": socks connect " +
 				"tcp 127.0.0.1:1158->no_such_host.test:80: unknown error host unreachable",
+		},
+		"not_allowed_command": {
+			proxyAddress: "127.0.0.1:1159",
+			proxyOpts: []socks5.Option{
+				socks5.WithAllowCommands(),
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1159),
+			},
+			destinationUrl: "http://localhost:4000",
+			errString: "Get \"http://localhost:4000\": socks connect " +
+				"tcp 127.0.0.1:1159->localhost:4000: unknown error connection not allowed by ruleset",
 		},
 	}
 
