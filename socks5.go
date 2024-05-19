@@ -1,3 +1,4 @@
+// Package socks5 a fully featured implementation of the SOCKS 5 protocol in golang.
 package socks5
 
 import (
