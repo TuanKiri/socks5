@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+const (
+	Connect Command = iota + 1
+	Bind
+	UDPAssociate
+)
+
+type Command int
+
 type Option func(*options)
 
 type options struct {
@@ -20,6 +28,7 @@ type options struct {
 	getPasswordTimeout     time.Duration
 	passwordAuthentication bool
 	staticCredentials      map[string]string
+	allowCommands          map[byte]struct{}
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -82,8 +91,12 @@ func optsWithDefaults(opts *options) *options {
 	}
 
 	if opts.rules == nil {
+		if opts.allowCommands == nil {
+			opts.allowCommands = permitAllCommands()
+		}
+
 		opts.rules = &serverRules{
-			allowCommands: permitAllCommands(),
+			allowCommands: opts.allowCommands,
 		}
 	}
 
@@ -171,5 +184,17 @@ func WithMetrics(val Metrics) Option {
 func WithRules(val Rules) Option {
 	return func(o *options) {
 		o.rules = val
+	}
+}
+
+func WithAllowCommands(commands ...Command) Option {
+	allowCommands := map[byte]struct{}{}
+
+	for _, command := range commands {
+		allowCommands[byte(command)] = struct{}{}
+	}
+
+	return func(o *options) {
+		o.allowCommands = allowCommands
 	}
 }
