@@ -22,7 +22,7 @@ type Server struct {
 	store         Store
 	driver        Driver
 	metrics       Metrics
-	rules         RuleSet
+	rules         Rules
 	active        chan struct{}
 	done          chan struct{}
 	closeListener func() error
@@ -51,6 +51,7 @@ func New(opts ...Option) *Server {
 		store:   options.store,
 		driver:  options.driver,
 		metrics: options.metrics,
+		rules:   options.rules,
 		active:  make(chan struct{}),
 		done:    make(chan struct{}),
 	}

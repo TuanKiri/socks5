@@ -24,6 +24,7 @@ type options struct {
 	store                  Store
 	driver                 Driver
 	metrics                Metrics
+	rules                  Rules
 }
 
 func (o options) authMethods() map[byte]struct{} {
@@ -78,6 +79,12 @@ func optsWithDefaults(opts *options) *options {
 
 	if opts.metrics == nil {
 		opts.metrics = &nopMetrics{}
+	}
+
+	if opts.rules == nil {
+		opts.rules = &serverRules{
+			allowCommands: permitAllCommands(),
+		}
 	}
 
 	return opts
@@ -158,5 +165,11 @@ func WithDriver(val Driver) Option {
 func WithMetrics(val Metrics) Option {
 	return func(o *options) {
 		o.metrics = val
+	}
+}
+
+func WithRules(val Rules) Option {
+	return func(o *options) {
+		o.rules = val
 	}
 }
