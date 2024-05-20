@@ -24,6 +24,7 @@ const (
 	addressTypeIPv6 byte = 0x04
 
 	connect      byte = 0x01
+	bind         byte = 0x02
 	udpAssociate byte = 0x03
 
 	connectionSuccessful          byte = 0x00

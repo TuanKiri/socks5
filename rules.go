@@ -18,6 +18,7 @@ func (r *serverRules) AllowCommand(ctx context.Context, cmd byte) bool {
 func permitAllCommands() map[byte]struct{} {
 	return map[byte]struct{}{
 		connect:      {},
+		bind:         {},
 		udpAssociate: {},
 	}
 }
