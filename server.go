@@ -114,7 +114,7 @@ func (s *Server) serve(conn net.Conn) {
 
 	s.setConnDeadline(conn)
 
-	ctx := contextWithRemoteAddress(context.Background(), remoteAddr.String())
+	ctx := contextWithRemoteAddress(context.Background(), remoteAddr)
 
 	s.handshake(ctx, newConnection(conn))
 }
