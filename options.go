@@ -29,6 +29,7 @@ type options struct {
 	passwordAuthentication bool
 	staticCredentials      map[string]string
 	allowCommands          map[byte]struct{}
+	allowIPs               []net.IP
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -97,6 +98,7 @@ func optsWithDefaults(opts *options) *options {
 
 		opts.rules = &serverRules{
 			allowCommands: opts.allowCommands,
+			allowIPs:      opts.allowIPs,
 		}
 	}
 
@@ -196,5 +198,11 @@ func WithAllowCommands(commands ...Command) Option {
 
 	return func(o *options) {
 		o.allowCommands = allowCommands
+	}
+}
+
+func WithWhiteListIPs(IPs ...net.IP) Option {
+	return func(o *options) {
+		o.allowIPs = IPs
 	}
 }

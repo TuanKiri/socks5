@@ -106,9 +106,15 @@ func (s *Server) Shutdown() error {
 func (s *Server) serve(conn net.Conn) {
 	defer conn.Close()
 
+	remoteAddr := conn.RemoteAddr()
+
+	if !s.rules.IsAllowConnection(remoteAddr) {
+		return
+	}
+
 	s.setConnDeadline(conn)
 
-	ctx := contextWithRemoteAddress(context.Background(), conn.RemoteAddr().String())
+	ctx := contextWithRemoteAddress(context.Background(), remoteAddr.String())
 
 	s.handshake(ctx, newConnection(conn))
 }

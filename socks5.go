@@ -144,14 +144,14 @@ func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
 
 	switch command {
 	case connect:
-		if !s.rules.AllowCommand(ctx, connect) {
+		if !s.rules.IsAllowCommand(ctx, connect) {
 			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
 			return
 		}
 
 		s.connect(ctx, conn, &addr)
 	case udpAssociate:
-		if !s.rules.AllowCommand(ctx, udpAssociate) {
+		if !s.rules.IsAllowCommand(ctx, udpAssociate) {
 			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
 			return
 		}
