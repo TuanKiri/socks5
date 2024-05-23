@@ -26,6 +26,14 @@ func (a address) String() string {
 	return fmt.Sprintf("%s:%s", a.Domain, a.Port)
 }
 
+func (a address) getHostOrIP() string {
+	if a.IP != nil {
+		return a.IP.String()
+	}
+
+	return string(a.Domain)
+}
+
 type port []byte
 
 func (p port) String() string {

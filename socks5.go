@@ -142,6 +142,11 @@ func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
 		return
 	}
 
+	if !s.rules.IsAllowDestination(ctx, addr.getHostOrIP()) {
+		s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+		return
+	}
+
 	switch command {
 	case connect:
 		if !s.rules.IsAllowCommand(ctx, connect) {
@@ -311,6 +316,10 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	addr.Port = make([]byte, 2)
 	if _, err := conn.read(addr.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port from packet: "+err.Error())
+		return
+	}
+
+	if !s.rules.IsAllowDestination(ctx, addr.getHostOrIP()) {
 		return
 	}
 

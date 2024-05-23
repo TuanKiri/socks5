@@ -6,12 +6,14 @@ import (
 )
 
 type Rules interface {
-	IsAllowConnection(addr net.Addr) bool
 	IsAllowCommand(ctx context.Context, cmd byte) bool
+	IsAllowConnection(addr net.Addr) bool
+	IsAllowDestination(ctx context.Context, host string) bool
 }
 
 type serverRules struct {
 	allowCommands map[byte]struct{}
+	blockList     map[string]struct{}
 	allowIPs      []net.IP
 }
 
@@ -37,6 +39,15 @@ func (r *serverRules) IsAllowConnection(addr net.Addr) bool {
 	}
 
 	return false
+}
+
+func (r *serverRules) IsAllowDestination(ctx context.Context, host string) bool {
+	if r.blockList == nil {
+		return true
+	}
+
+	_, ok := r.blockList[host]
+	return !ok
 }
 
 func permitAllCommands() map[byte]struct{} {

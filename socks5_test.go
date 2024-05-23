@@ -128,6 +128,37 @@ func TestProxyConnect(t *testing.T) {
 			errString: "Get \"http://localhost:4000\": socks connect " +
 				"tcp 127.0.0.1:1159->localhost:4000: unknown error connection not allowed by ruleset",
 		},
+		"not_allowed_host": {
+			proxyAddress: "127.0.0.1:1160",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1160),
+				socks5.WithDriver(&testTLSDriver{
+					tlsConfig: &tls.Config{
+						Certificates: []tls.Certificate{cert},
+					},
+				}),
+				socks5.WithBlockList(
+					"www.google.com",
+				),
+			},
+			destinationUrl: "https://www.google.com",
+			errString: "Get \"https://www.google.com\": socks connect " +
+				"tcp 127.0.0.1:1160->www.google.com:443: unknown error connection not allowed by ruleset",
+		},
+		"not_allowed_ip": {
+			proxyAddress: "127.0.0.1:1161",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1161),
+				socks5.WithBlockList(
+					"173.194.222.102",
+				),
+			},
+			destinationUrl: "http://173.194.222.102",
+			errString: "Get \"http://173.194.222.102\": socks connect " +
+				"tcp 127.0.0.1:1161->173.194.222.102:80: unknown error connection not allowed by ruleset",
+		},
 	}
 
 	for name, tc := range cases {

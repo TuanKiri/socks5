@@ -29,6 +29,7 @@ type options struct {
 	passwordAuthentication bool
 	staticCredentials      map[string]string
 	allowCommands          map[byte]struct{}
+	blockList              map[string]struct{}
 	allowIPs               []net.IP
 	logger                 Logger
 	store                  Store
@@ -98,6 +99,7 @@ func optsWithDefaults(opts *options) *options {
 
 		opts.rules = &serverRules{
 			allowCommands: opts.allowCommands,
+			blockList:     opts.blockList,
 			allowIPs:      opts.allowIPs,
 		}
 	}
@@ -204,5 +206,17 @@ func WithAllowCommands(commands ...Command) Option {
 func WithWhiteListIPs(IPs ...net.IP) Option {
 	return func(o *options) {
 		o.allowIPs = IPs
+	}
+}
+
+func WithBlockList(hosts ...string) Option {
+	blockList := map[string]struct{}{}
+
+	for _, host := range hosts {
+		blockList[host] = struct{}{}
+	}
+
+	return func(o *options) {
+		o.blockList = blockList
 	}
 }
