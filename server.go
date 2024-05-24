@@ -22,6 +22,7 @@ type Server struct {
 	store         Store
 	driver        Driver
 	metrics       Metrics
+	rules         Rules
 	active        chan struct{}
 	done          chan struct{}
 	closeListener func() error
@@ -50,6 +51,7 @@ func New(opts ...Option) *Server {
 		store:   options.store,
 		driver:  options.driver,
 		metrics: options.metrics,
+		rules:   options.rules,
 		active:  make(chan struct{}),
 		done:    make(chan struct{}),
 	}
@@ -104,9 +106,15 @@ func (s *Server) Shutdown() error {
 func (s *Server) serve(conn net.Conn) {
 	defer conn.Close()
 
+	remoteAddr := conn.RemoteAddr()
+
+	if !s.rules.IsAllowConnection(remoteAddr) {
+		return
+	}
+
 	s.setConnDeadline(conn)
 
-	ctx := contextWithRemoteAddress(context.Background(), conn.RemoteAddr().String())
+	ctx := contextWithRemoteAddress(context.Background(), remoteAddr)
 
 	s.handshake(ctx, newConnection(conn))
 }

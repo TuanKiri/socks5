@@ -1,6 +1,9 @@
 package socks5
 
-import "context"
+import (
+	"context"
+	"net"
+)
 
 type ctxKey int
 
@@ -9,12 +12,12 @@ const (
 	usernameKey
 )
 
-func contextWithRemoteAddress(ctx context.Context, address string) context.Context {
-	return context.WithValue(ctx, remoteAddressKey, address)
+func contextWithRemoteAddress(ctx context.Context, addr net.Addr) context.Context {
+	return context.WithValue(ctx, remoteAddressKey, addr)
 }
 
-func RemoteAddressFromContext(ctx context.Context) (string, bool) {
-	value, ok := ctx.Value(remoteAddressKey).(string)
+func RemoteAddressFromContext(ctx context.Context) (net.Addr, bool) {
+	value, ok := ctx.Value(remoteAddressKey).(net.Addr)
 	return value, ok
 }
 

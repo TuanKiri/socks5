@@ -79,7 +79,6 @@ func TestProxyConnect(t *testing.T) {
 			proxyOpts: []socks5.Option{
 				socks5.WithLogger(socks5.NopLogger),
 				socks5.WithPort(1155),
-				socks5.WithPasswordAuthentication(),
 				socks5.WithDriver(&testTLSDriver{
 					tlsConfig: &tls.Config{
 						Certificates: []tls.Certificate{cert},
@@ -87,11 +86,7 @@ func TestProxyConnect(t *testing.T) {
 				}),
 			},
 			destinationUrl: "https://localhost:6444/ping",
-			clientCredentials: &proxy.Auth{
-				User:     "root",
-				Password: "password",
-			},
-			wait: []byte("pong!"),
+			wait:           []byte("pong!"),
 		},
 		"connection_refused": {
 			proxyAddress: "127.0.0.1:1156",
@@ -121,6 +116,48 @@ func TestProxyConnect(t *testing.T) {
 			destinationUrl: "http://no_such_host.test",
 			errString: "Get \"http://no_such_host.test\": socks connect " +
 				"tcp 127.0.0.1:1158->no_such_host.test:80: unknown error host unreachable",
+		},
+		"not_allowed_command": {
+			proxyAddress: "127.0.0.1:1159",
+			proxyOpts: []socks5.Option{
+				socks5.WithAllowCommands(),
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1159),
+			},
+			destinationUrl: "http://localhost:4000",
+			errString: "Get \"http://localhost:4000\": socks connect " +
+				"tcp 127.0.0.1:1159->localhost:4000: unknown error connection not allowed by ruleset",
+		},
+		"not_allowed_host": {
+			proxyAddress: "127.0.0.1:1160",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1160),
+				socks5.WithDriver(&testTLSDriver{
+					tlsConfig: &tls.Config{
+						Certificates: []tls.Certificate{cert},
+					},
+				}),
+				socks5.WithBlockListHosts(
+					"www.google.com",
+				),
+			},
+			destinationUrl: "https://www.google.com",
+			errString: "Get \"https://www.google.com\": socks connect " +
+				"tcp 127.0.0.1:1160->www.google.com:443: unknown error connection not allowed by ruleset",
+		},
+		"not_allowed_ip": {
+			proxyAddress: "127.0.0.1:1161",
+			proxyOpts: []socks5.Option{
+				socks5.WithLogger(socks5.NopLogger),
+				socks5.WithPort(1161),
+				socks5.WithBlockListHosts(
+					"173.194.222.102",
+				),
+			},
+			destinationUrl: "http://173.194.222.102",
+			errString: "Get \"http://173.194.222.102\": socks connect " +
+				"tcp 127.0.0.1:1161->173.194.222.102:80: unknown error connection not allowed by ruleset",
 		},
 	}
 

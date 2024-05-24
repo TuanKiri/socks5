@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+const (
+	Connect Command = iota + 1
+	Bind
+	UDPAssociate
+)
+
+type Command int
+
 type Option func(*options)
 
 type options struct {
@@ -20,10 +28,14 @@ type options struct {
 	getPasswordTimeout     time.Duration
 	passwordAuthentication bool
 	staticCredentials      map[string]string
+	allowCommands          map[byte]struct{}
+	blockListHosts         map[string]struct{}
+	allowIPs               []net.IP
 	logger                 Logger
 	store                  Store
 	driver                 Driver
 	metrics                Metrics
+	rules                  Rules
 }
 
 func (o options) authMethods() map[byte]struct{} {
@@ -78,6 +90,18 @@ func optsWithDefaults(opts *options) *options {
 
 	if opts.metrics == nil {
 		opts.metrics = &nopMetrics{}
+	}
+
+	if opts.rules == nil {
+		if opts.allowCommands == nil {
+			opts.allowCommands = permitAllCommands()
+		}
+
+		opts.rules = &serverRules{
+			allowCommands:  opts.allowCommands,
+			blockListHosts: opts.blockListHosts,
+			allowIPs:       opts.allowIPs,
+		}
 	}
 
 	return opts
@@ -158,5 +182,41 @@ func WithDriver(val Driver) Option {
 func WithMetrics(val Metrics) Option {
 	return func(o *options) {
 		o.metrics = val
+	}
+}
+
+func WithRules(val Rules) Option {
+	return func(o *options) {
+		o.rules = val
+	}
+}
+
+func WithAllowCommands(commands ...Command) Option {
+	allowCommands := map[byte]struct{}{}
+
+	for _, command := range commands {
+		allowCommands[byte(command)] = struct{}{}
+	}
+
+	return func(o *options) {
+		o.allowCommands = allowCommands
+	}
+}
+
+func WithWhiteListIPs(IPs ...net.IP) Option {
+	return func(o *options) {
+		o.allowIPs = IPs
+	}
+}
+
+func WithBlockListHosts(hosts ...string) Option {
+	blockListHosts := map[string]struct{}{}
+
+	for _, host := range hosts {
+		blockListHosts[host] = struct{}{}
+	}
+
+	return func(o *options) {
+		o.blockListHosts = blockListHosts
 	}
 }

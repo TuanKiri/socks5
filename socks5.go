@@ -1,3 +1,4 @@
+// Package socks5 a fully featured implementation of the SOCKS 5 protocol in golang.
 package socks5
 
 import (
@@ -23,15 +24,17 @@ const (
 	addressTypeIPv6 byte = 0x04
 
 	connect      byte = 0x01
+	bind         byte = 0x02
 	udpAssociate byte = 0x03
 
-	connectionSuccessful      byte = 0x00
-	generalSOCKSserverFailure byte = 0x01
-	networkUnreachable        byte = 0x03
-	hostUnreachable           byte = 0x04
-	connectionRefused         byte = 0x05
-	commandNotSupported       byte = 0x07
-	addressTypeNotSupported   byte = 0x08
+	connectionSuccessful          byte = 0x00
+	generalSOCKSserverFailure     byte = 0x01
+	connectionNotAllowedByRuleSet byte = 0x02
+	networkUnreachable            byte = 0x03
+	hostUnreachable               byte = 0x04
+	connectionRefused             byte = 0x05
+	commandNotSupported           byte = 0x07
+	addressTypeNotSupported       byte = 0x08
 )
 
 func (s *Server) handshake(ctx context.Context, conn *connection) {
@@ -69,7 +72,6 @@ func (s *Server) handshake(ctx context.Context, conn *connection) {
 		s.usernamePasswordAuthenticate(ctx, conn)
 	default:
 		s.response(ctx, conn, version5, noAcceptableMethods)
-		return
 	}
 }
 
@@ -140,14 +142,28 @@ func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
 		return
 	}
 
+	if !s.rules.IsAllowDestination(ctx, addr.getDomainOrIP()) {
+		s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+		return
+	}
+
 	switch command {
 	case connect:
+		if !s.rules.IsAllowCommand(ctx, connect) {
+			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+			return
+		}
+
 		s.connect(ctx, conn, &addr)
 	case udpAssociate:
+		if !s.rules.IsAllowCommand(ctx, udpAssociate) {
+			s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
+			return
+		}
+
 		s.udpAssociate(ctx, conn, &addr)
 	default:
 		s.replyRequest(ctx, conn, commandNotSupported, &addr)
-		return
 	}
 }
 
@@ -300,6 +316,10 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 	addr.Port = make([]byte, 2)
 	if _, err := conn.read(addr.Port); err != nil {
 		s.logger.Error(ctx, "failed to read port from packet: "+err.Error())
+		return
+	}
+
+	if !s.rules.IsAllowDestination(ctx, addr.getDomainOrIP()) {
 		return
 	}
 
