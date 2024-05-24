@@ -142,7 +142,7 @@ func (s *Server) acceptRequest(ctx context.Context, conn *connection) {
 		return
 	}
 
-	if !s.rules.IsAllowDestination(ctx, addr.getHostOrIP()) {
+	if !s.rules.IsAllowDestination(ctx, addr.getDomainOrIP()) {
 		s.replyRequest(ctx, conn, connectionNotAllowedByRuleSet, &addr)
 		return
 	}
@@ -319,7 +319,7 @@ func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
 		return
 	}
 
-	if !s.rules.IsAllowDestination(ctx, addr.getHostOrIP()) {
+	if !s.rules.IsAllowDestination(ctx, addr.getDomainOrIP()) {
 		return
 	}
 

@@ -12,9 +12,9 @@ type Rules interface {
 }
 
 type serverRules struct {
-	allowCommands map[byte]struct{}
-	blockList     map[string]struct{}
-	allowIPs      []net.IP
+	allowCommands  map[byte]struct{}
+	blockListHosts map[string]struct{}
+	allowIPs       []net.IP
 }
 
 func (r *serverRules) IsAllowCommand(ctx context.Context, cmd byte) bool {
@@ -42,11 +42,11 @@ func (r *serverRules) IsAllowConnection(addr net.Addr) bool {
 }
 
 func (r *serverRules) IsAllowDestination(ctx context.Context, host string) bool {
-	if r.blockList == nil {
+	if r.blockListHosts == nil {
 		return true
 	}
 
-	_, ok := r.blockList[host]
+	_, ok := r.blockListHosts[host]
 	return !ok
 }
 

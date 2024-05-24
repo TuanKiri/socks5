@@ -34,7 +34,7 @@ func TestIPRules(t *testing.T) {
 			address:  &net.UDPAddr{},
 			allow:    false,
 		},
-		"without_allow_IPs": {
+		"without_slice_allow_IPs": {
 			allow: true,
 		},
 	}

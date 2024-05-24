@@ -138,7 +138,7 @@ func TestProxyConnect(t *testing.T) {
 						Certificates: []tls.Certificate{cert},
 					},
 				}),
-				socks5.WithBlockList(
+				socks5.WithBlockListHosts(
 					"www.google.com",
 				),
 			},
@@ -151,7 +151,7 @@ func TestProxyConnect(t *testing.T) {
 			proxyOpts: []socks5.Option{
 				socks5.WithLogger(socks5.NopLogger),
 				socks5.WithPort(1161),
-				socks5.WithBlockList(
+				socks5.WithBlockListHosts(
 					"173.194.222.102",
 				),
 			},
