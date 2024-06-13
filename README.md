@@ -84,6 +84,11 @@ If you have any questions, you can ask in [GitHub Discussions](https://github.co
 
 * The proof of work for the UDP association was done using [qBittorrent](https://github.com/qbittorrent/qBittorrent) - a BitTorrent client.
 
+## Contributing
+Feel free to open tickets or send pull requests with improvements. Thanks in advance for your help!
+
+Please follow the [contribution guidelines](.github/CONTRIBUTING.md).
+
 ## References
 
 * [RFC 1928](https://www.rfc-editor.org/rfc/rfc1928.txt) SOCKS Protocol Version 5
