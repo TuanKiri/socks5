@@ -1,6 +1,5 @@
 name: Bug report
 description: Create a bug report for socks 5 server
-title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: textarea
