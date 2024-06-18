@@ -70,7 +70,7 @@ The following curl example shows how to use the proxy server:
 
     curl -x socks5://127.0.0.1:1080 http://example.com
 
-See the [tests](socks5_test.go) for more information about package.
+See the [tests](socks5_test.go) and [examples](examples) for more information about package.
 
 ## FAQ
 
