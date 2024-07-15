@@ -6,14 +6,20 @@ import (
 	"time"
 )
 
+type timeoutPolicy struct {
+	readTimeout, writeTimeout time.Duration
+}
+
 type config struct {
 	host               string
 	address            string
-	readTimeout        time.Duration
-	writeTimeout       time.Duration
+	connTimeouts       *timeoutPolicy
+	packetConnTimeouts *timeoutPolicy
 	getPasswordTimeout time.Duration
 	authMethods        map[byte]struct{}
 	publicIP           net.IP
+	workerPool         int
+	lenPacketQueue     int
 }
 
 type Server struct {
@@ -41,11 +47,13 @@ func New(opts ...Option) *Server {
 		config: &config{
 			host:               options.host,
 			address:            options.listenAddress(),
-			readTimeout:        options.readTimeout,
-			writeTimeout:       options.writeTimeout,
+			connTimeouts:       options.connTimeouts(),
+			packetConnTimeouts: options.packetConnTimeouts(),
 			getPasswordTimeout: options.getPasswordTimeout,
 			authMethods:        options.authMethods(),
 			publicIP:           options.publicIP,
+			workerPool:         options.workerPool,
+			lenPacketQueue:     options.lenPacketQueue,
 		},
 		logger:  options.logger,
 		store:   options.store,
@@ -112,23 +120,11 @@ func (s *Server) serve(conn net.Conn) {
 		return
 	}
 
-	s.setConnDeadline(conn)
+	setConnTimeouts(conn, s.config.connTimeouts)
 
 	ctx := contextWithRemoteAddress(context.Background(), remoteAddr)
 
 	s.handshake(ctx, newConnection(conn))
-}
-
-func (s *Server) setConnDeadline(conn net.Conn) {
-	currentTime := time.Now().Local()
-
-	if s.config.readTimeout != 0 {
-		conn.SetReadDeadline(currentTime.Add(s.config.readTimeout))
-	}
-
-	if s.config.writeTimeout != 0 {
-		conn.SetWriteDeadline(currentTime.Add(s.config.writeTimeout))
-	}
 }
 
 func (s *Server) isActive() bool {
@@ -147,5 +143,17 @@ func closeListenerFn(l net.Listener) func() error {
 		}
 
 		return l.Close()
+	}
+}
+
+func setConnTimeouts(conn net.Conn, policy *timeoutPolicy) {
+	currentTime := time.Now().Local()
+
+	if policy.readTimeout != 0 {
+		conn.SetReadDeadline(currentTime.Add(policy.readTimeout))
+	}
+
+	if policy.writeTimeout != 0 {
+		conn.SetWriteDeadline(currentTime.Add(policy.writeTimeout))
 	}
 }

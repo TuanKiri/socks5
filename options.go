@@ -22,15 +22,19 @@ type options struct {
 	host                   string
 	port                   int
 	publicIP               net.IP
-	readTimeout            time.Duration
-	writeTimeout           time.Duration
 	dialTimeout            time.Duration
 	getPasswordTimeout     time.Duration
+	connReadTimeout        time.Duration
+	connWriteTimeout       time.Duration
+	packetConnReadTimeout  time.Duration
+	packetConnWriteTimeout time.Duration
 	passwordAuthentication bool
 	staticCredentials      map[string]string
 	allowCommands          map[byte]struct{}
 	blockListHosts         map[string]struct{}
 	allowIPs               []net.IP
+	workerPool             int
+	lenPacketQueue         int
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -55,6 +59,20 @@ func (o options) listenAddress() string {
 	return fmt.Sprintf("%s:%d", o.host, o.port)
 }
 
+func (o options) connTimeouts() *timeoutPolicy {
+	return &timeoutPolicy{
+		readTimeout:  o.connReadTimeout,
+		writeTimeout: o.connWriteTimeout,
+	}
+}
+
+func (o options) packetConnTimeouts() *timeoutPolicy {
+	return &timeoutPolicy{
+		readTimeout:  o.packetConnReadTimeout,
+		writeTimeout: o.packetConnWriteTimeout,
+	}
+}
+
 func optsWithDefaults(opts *options) *options {
 	if opts.port == 0 {
 		opts.port = 1080
@@ -62,6 +80,10 @@ func optsWithDefaults(opts *options) *options {
 
 	if opts.publicIP == nil {
 		opts.publicIP = net.ParseIP("127.0.0.1")
+	}
+
+	if opts.workerPool == 0 {
+		opts.workerPool = 50
 	}
 
 	if opts.logger == nil {
@@ -127,13 +149,13 @@ func WithPublicIP(val net.IP) Option {
 
 func WithReadTimeout(val time.Duration) Option {
 	return func(o *options) {
-		o.readTimeout = val
+		o.connReadTimeout = val
 	}
 }
 
 func WithWriteTimeout(val time.Duration) Option {
 	return func(o *options) {
-		o.writeTimeout = val
+		o.connWriteTimeout = val
 	}
 }
 
@@ -218,5 +240,34 @@ func WithBlockListHosts(hosts ...string) Option {
 
 	return func(o *options) {
 		o.blockListHosts = blockListHosts
+	}
+}
+
+// WithWorkerPool always sets a minimum of one worker, even if the value is 0 or less.
+func WithWorkerPool(val int) Option {
+	if val < 1 {
+		val = 1
+	}
+
+	return func(o *options) {
+		o.workerPool = val
+	}
+}
+
+func WithPacketReadTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.packetConnReadTimeout = val
+	}
+}
+
+func WithPacketWriteTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.packetConnWriteTimeout = val
+	}
+}
+
+func WithLenPacketQueue(val int) Option {
+	return func(o *options) {
+		o.lenPacketQueue = val
 	}
 }
