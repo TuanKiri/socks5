@@ -20,7 +20,7 @@ func isConnectionRefusedError(err error) bool {
 		return true
 	}
 
-	// For example error: https://github.com/golang/go/issues/45621
+	// For example error: https://github.com/golang/go/issues/45621.
 	return strings.Contains(err.Error(), "refused")
 }
 

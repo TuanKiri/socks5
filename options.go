@@ -35,6 +35,7 @@ type options struct {
 	allowIPs               []net.IP
 	workerPool             int
 	lenPacketQueue         int
+	maxPacketSize          int
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -84,6 +85,15 @@ func optsWithDefaults(opts *options) *options {
 
 	if opts.workerPool == 0 {
 		opts.workerPool = 50
+	}
+
+	if opts.lenPacketQueue == 0 {
+		opts.lenPacketQueue = 100
+	}
+
+	if opts.maxPacketSize == 0 {
+		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes.
+		opts.maxPacketSize = 65507
 	}
 
 	if opts.logger == nil {
@@ -269,5 +279,11 @@ func WithPacketWriteTimeout(val time.Duration) Option {
 func WithLenPacketQueue(val int) Option {
 	return func(o *options) {
 		o.lenPacketQueue = val
+	}
+}
+
+func WithMaxPacketSize(val int) Option {
+	return func(o *options) {
+		o.maxPacketSize = val
 	}
 }

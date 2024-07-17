@@ -247,6 +247,9 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	wg.Wait()
 
+	close(input)
+	close(output)
+
 	s.logger.Info(ctx, "udp datagram forwarding complete")
 }
 
@@ -279,6 +282,20 @@ func (s *Server) servePackets(ctx context.Context, wg *sync.WaitGroup, conn *con
 		if !ok {
 			continue
 		}
+
+		payload, err := packet.decode()
+		if err != nil {
+			s.logger.Error(ctx, "error packet decode: "+err.Error())
+			continue
+		}
+
+		payload.data, err = s.sendPacketData(ctx, payload.address, payload.data)
+		if err != nil {
+			s.logger.Error(ctx, "failed to send packet data: "+err.Error())
+			continue
+		}
+
+		packet.encode(payload)
 
 		if ok := writeToQueue(output, packet); !ok {
 			s.logger.Warn(ctx, "udp output queue is full")

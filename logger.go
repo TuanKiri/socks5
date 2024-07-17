@@ -44,5 +44,5 @@ func (l *nopLogger) Info(_ context.Context, _ string, _ ...any)  {}
 func (l *nopLogger) Warn(_ context.Context, _ string, _ ...any)  {}
 func (l *nopLogger) Error(_ context.Context, _ string, _ ...any) {}
 
-// Silent logger, produces no output
+// Silent logger, produces no output.
 var NopLogger *nopLogger

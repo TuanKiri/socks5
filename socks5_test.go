@@ -152,7 +152,7 @@ func TestProxyConnect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			go runProxy(tc.proxyOpts)
 
-			// Wait for socks5 proxy to start
+			// Wait for socks5 proxy to start.
 			time.Sleep(100 * time.Millisecond)
 
 			client, err := setupClient(tc.proxyAddress, tc.clientCredentials)
