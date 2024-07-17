@@ -67,7 +67,7 @@ func (c *connection) keepAlive() {
 		return
 	}
 
-	c.closeFn()
-
 	close(c.done)
+
+	c.closeFn()
 }
