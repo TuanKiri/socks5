@@ -75,7 +75,7 @@ func (o options) packetConnTimeouts() *timeoutPolicy {
 }
 
 func optsWithDefaults(opts *options) *options {
-	if opts.port == 0 {
+	if opts.port <= 0 {
 		opts.port = 1080
 	}
 
@@ -83,15 +83,15 @@ func optsWithDefaults(opts *options) *options {
 		opts.publicIP = net.ParseIP("127.0.0.1")
 	}
 
-	if opts.workerPool == 0 {
+	if opts.workerPool <= 0 {
 		opts.workerPool = 50
 	}
 
-	if opts.lenPacketQueue == 0 {
+	if opts.lenPacketQueue <= 0 {
 		opts.lenPacketQueue = 100
 	}
 
-	if opts.maxPacketSize == 0 {
+	if opts.maxPacketSize <= 0 {
 		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes.
 		opts.maxPacketSize = 65507
 	}
@@ -253,12 +253,7 @@ func WithBlockListHosts(hosts ...string) Option {
 	}
 }
 
-// WithWorkerPool always sets a minimum of one worker, even if the value is 0 or less.
 func WithWorkerPool(val int) Option {
-	if val < 1 {
-		val = 1
-	}
-
 	return func(o *options) {
 		o.workerPool = val
 	}
