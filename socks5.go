@@ -247,9 +247,6 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	wg.Wait()
 
-	close(input)
-	close(output)
-
 	s.logger.Info(ctx, "udp datagram forwarding complete")
 }
 

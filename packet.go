@@ -17,15 +17,15 @@ type packetInfo struct {
 }
 
 func (p *packetInfo) decode() (*payload, error) {
-	reader := bytes.NewBuffer(p.payload)
+	buffer := bytes.NewBuffer(p.payload)
 
 	// Reserved 2 bytes: 0x00, 0x00
-	if _, err := reader.Read(make([]byte, 2)); err != nil {
+	if _, err := buffer.Read(make([]byte, 2)); err != nil {
 		return nil, errors.New("failed to read reserved bytes")
 	}
 
 	// Current fragment number
-	frag, err := reader.ReadByte()
+	frag, err := buffer.ReadByte()
 	if err != nil {
 		return nil, errors.New("failed to read current fragment number")
 	}
@@ -35,52 +35,52 @@ func (p *packetInfo) decode() (*payload, error) {
 		return nil, errors.New("not support fragmentation")
 	}
 
-	var addr address
+	var address address
 
-	addr.Type, err = reader.ReadByte()
+	address.Type, err = buffer.ReadByte()
 	if err != nil {
 		return nil, errors.New("failed to read address type")
 	}
 
-	switch addr.Type {
+	switch address.Type {
 	case addressTypeIPv4:
-		addr.IP = make(net.IP, net.IPv4len)
-		if _, err := reader.Read(addr.IP); err != nil {
+		address.IP = make(net.IP, net.IPv4len)
+		if _, err := buffer.Read(address.IP); err != nil {
 			return nil, errors.New("failed to read IPv4 address")
 		}
 	case addressTypeFQDN:
-		addr.DomainLen, err = reader.ReadByte()
+		address.DomainLen, err = buffer.ReadByte()
 		if err != nil {
 			return nil, errors.New("failed to read domain length")
 		}
 
-		addr.Domain = make([]byte, addr.DomainLen)
-		if _, err := reader.Read(addr.Domain); err != nil {
+		address.Domain = make([]byte, address.DomainLen)
+		if _, err := buffer.Read(address.Domain); err != nil {
 			return nil, errors.New("failed to read domain")
 		}
 	case addressTypeIPv6:
-		addr.IP = make(net.IP, net.IPv6len)
-		if _, err := reader.Read(addr.IP); err != nil {
+		address.IP = make(net.IP, net.IPv6len)
+		if _, err := buffer.Read(address.IP); err != nil {
 			return nil, errors.New("failed to read IPv6 address")
 		}
 	default:
 		return nil, errors.New("not support address type")
 	}
 
-	addr.Port = make([]byte, 2)
+	address.Port = make([]byte, 2)
 
-	if _, err := reader.Read(addr.Port); err != nil {
+	if _, err := buffer.Read(address.Port); err != nil {
 		return nil, errors.New("failed to read port")
 	}
 
 	return &payload{
-		address: &addr,
-		data:    reader.Bytes(),
+		address: &address,
+		data:    buffer.Bytes(),
 	}, nil
 }
 
 func (p *packetInfo) encode(payload *payload) {
-	res := []byte{
+	p.payload = []byte{
 		0x00, // Reserved byte
 		0x00, // Reserved byte
 		0x00, // Current fragment number
@@ -89,18 +89,16 @@ func (p *packetInfo) encode(payload *payload) {
 
 	switch payload.address.Type {
 	case addressTypeIPv4:
-		res = append(res, payload.address.IP.To4()...)
+		p.payload = append(p.payload, payload.address.IP.To4()...)
 	case addressTypeFQDN:
-		res = append(res, payload.address.DomainLen)
-		res = append(res, payload.address.Domain...)
+		p.payload = append(p.payload, payload.address.DomainLen)
+		p.payload = append(p.payload, payload.address.Domain...)
 	case addressTypeIPv6:
-		res = append(res, payload.address.IP.To16()...)
+		p.payload = append(p.payload, payload.address.IP.To16()...)
 	}
 
-	res = append(res, payload.address.Port...)
-	res = append(res, payload.data...)
-
-	p.payload = res
+	p.payload = append(p.payload, payload.address.Port...)
+	p.payload = append(p.payload, payload.data...)
 }
 
 func readFromQueue(queue <-chan *packetInfo) (*packetInfo, bool) {
