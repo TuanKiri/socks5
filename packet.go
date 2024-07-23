@@ -119,18 +119,23 @@ func writeToQueue(queue chan<- *packetInfo, packet *packetInfo) bool {
 	}
 }
 
-func readFromPacketConn(packetConn net.PacketConn) (*packetInfo, error) {
-	datagram := make([]byte, 65507)
+func readFromPacketConn(packetConn net.PacketConn, bytePool *bytePool) (*packetInfo, error) {
+	datagram := bytePool.getBytes()
+	defer bytePool.putBytes(datagram)
 
 	n, clientAddress, err := packetConn.ReadFrom(datagram)
 	if err != nil {
 		return nil, err
 	}
 
-	return &packetInfo{
+	packet := &packetInfo{
 		clientAddress: clientAddress,
-		payload:       datagram[:n],
-	}, nil
+		payload:       make([]byte, n),
+	}
+
+	copy(packet.payload, datagram[:n])
+
+	return packet, nil
 }
 
 func writeToPacketConn(packetConn net.PacketConn, packet *packetInfo) error {

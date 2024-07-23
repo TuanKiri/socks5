@@ -29,6 +29,7 @@ type Server struct {
 	driver        Driver
 	metrics       Metrics
 	rules         Rules
+	bytePool      *bytePool
 	active        chan struct{}
 	done          chan struct{}
 	closeListener func() error
@@ -55,13 +56,14 @@ func New(opts ...Option) *Server {
 			workerPool:         options.workerPool,
 			lenPacketQueue:     options.lenPacketQueue,
 		},
-		logger:  options.logger,
-		store:   options.store,
-		driver:  options.driver,
-		metrics: options.metrics,
-		rules:   options.rules,
-		active:  make(chan struct{}),
-		done:    make(chan struct{}),
+		logger:   options.logger,
+		store:    options.store,
+		driver:   options.driver,
+		metrics:  options.metrics,
+		rules:    options.rules,
+		bytePool: newBytePool(options.maxPacketSize),
+		active:   make(chan struct{}),
+		done:     make(chan struct{}),
 	}
 }
 

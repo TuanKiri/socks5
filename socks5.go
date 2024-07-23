@@ -252,7 +252,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 func (s *Server) readFromPacketConn(ctx context.Context, wg *sync.WaitGroup, conn *connection, packetConn net.PacketConn, input chan<- *packetInfo) {
 	for conn.isActive() {
-		packet, err := readFromPacketConn(packetConn)
+		packet, err := readFromPacketConn(packetConn, s.bytePool)
 		if err != nil {
 			if !isClosedListenerError(err) {
 				s.logger.Error(ctx, "error read packet from udp connection: "+err.Error())
