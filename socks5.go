@@ -335,7 +335,8 @@ func (s *Server) sendPacketData(ctx context.Context, addr *address, data []byte)
 
 	s.metrics.UploadBytes(ctx, int64(n))
 
-	response := make([]byte, 65507)
+	response := s.bytePool.getBytes()
+	defer s.bytePool.putBytes(response)
 
 	n, err = target.Read(response)
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *Server) sendPacketData(ctx context.Context, addr *address, data []byte)
 
 	s.metrics.DownloadBytes(ctx, int64(n))
 
-	return response[:n], nil
+	return append(make([]byte, 0, n), response[:n]...), nil
 }
 
 func (s *Server) replyRequestWithError(ctx context.Context, conn *connection, err error, addr *address) {

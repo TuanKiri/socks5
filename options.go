@@ -92,7 +92,6 @@ func optsWithDefaults(opts *options) *options {
 	}
 
 	if opts.maxPacketSize <= 0 {
-		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes.
 		opts.maxPacketSize = 65507
 	}
 
