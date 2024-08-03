@@ -13,11 +13,11 @@ type payload struct {
 
 type packetInfo struct {
 	clientAddress net.Addr
-	payload       []byte
+	dstAddress    *address
 }
 
-func (p *packetInfo) decode() (*payload, error) {
-	buffer := bytes.NewBuffer(p.payload)
+func decode(data []byte) (*payload, error) {
+	buffer := bytes.NewBuffer(data)
 
 	// Reserved 2 bytes: 0x00, 0x00
 	if _, err := buffer.Read(make([]byte, 2)); err != nil {
@@ -79,36 +79,27 @@ func (p *packetInfo) decode() (*payload, error) {
 	}, nil
 }
 
-func (p *packetInfo) encode(payload *payload) {
-	p.payload = []byte{
-		0x00, // Reserved byte
-		0x00, // Reserved byte
-		0x00, // Current fragment number
-		payload.address.Type,
-	}
+// func encode(payload *payload) []byte {
+// data := []byte{
+// 	0x00, // Reserved byte
+// 	0x00, // Reserved byte
+// 	0x00, // Current fragment number
+// 	payload.address.Type,
+// }
 
-	switch payload.address.Type {
-	case addressTypeIPv4:
-		p.payload = append(p.payload, payload.address.IP.To4()...)
-	case addressTypeFQDN:
-		p.payload = append(p.payload, payload.address.DomainLen)
-		p.payload = append(p.payload, payload.address.Domain...)
-	case addressTypeIPv6:
-		p.payload = append(p.payload, payload.address.IP.To16()...)
-	}
+// switch payload.address.Type {
+// case addressTypeIPv4:
+// 	p.payload = append(p.payload, payload.address.IP.To4()...)
+// case addressTypeFQDN:
+// 	p.payload = append(p.payload, payload.address.DomainLen)
+// 	p.payload = append(p.payload, payload.address.Domain...)
+// case addressTypeIPv6:
+// 	p.payload = append(p.payload, payload.address.IP.To16()...)
+// }
 
-	p.payload = append(p.payload, payload.address.Port...)
-	p.payload = append(p.payload, payload.data...)
-}
-
-func readFromQueue(queue <-chan *packetInfo) (*packetInfo, bool) {
-	select {
-	case packet, ok := <-queue:
-		return packet, ok
-	default:
-		return nil, false
-	}
-}
+// p.payload = append(p.payload, payload.address.Port...)
+// p.payload = append(p.payload, payload.data...)
+// }
 
 func writeToQueue(queue chan<- *packetInfo, packet *packetInfo) bool {
 	select {
@@ -119,26 +110,26 @@ func writeToQueue(queue chan<- *packetInfo, packet *packetInfo) bool {
 	}
 }
 
-func readFromPacketConn(packetConn net.PacketConn, bytePool *bytePool) (*packetInfo, error) {
-	datagram := bytePool.getBytes()
-	defer bytePool.putBytes(datagram)
+// func readFromPacketConn(packetConn net.PacketConn, bytePool *bytePool) (*packetInfo, error) {
+// 	datagram := bytePool.getBytes()
+// 	defer bytePool.putBytes(datagram)
 
-	n, clientAddress, err := packetConn.ReadFrom(datagram)
-	if err != nil {
-		return nil, err
-	}
+// 	n, clientAddress, err := packetConn.ReadFrom(datagram)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	packet := &packetInfo{
-		clientAddress: clientAddress,
-		payload:       make([]byte, n),
-	}
+// 	packet := &packetInfo{
+// 		clientAddress: clientAddress,
+// 		payload:       make([]byte, n),
+// 	}
 
-	copy(packet.payload, datagram[:n])
+// 	copy(packet.payload, datagram[:n])
 
-	return packet, nil
-}
+// 	return packet, nil
+// }
 
-func writeToPacketConn(packetConn net.PacketConn, packet *packetInfo) error {
-	_, err := packetConn.WriteTo(packet.payload, packet.clientAddress)
-	return err
-}
+// func writeToPacketConn(packetConn net.PacketConn, packet *packetInfo) error {
+// 	_, err := packetConn.WriteTo(packet.payload, packet.clientAddress)
+// 	return err
+// }

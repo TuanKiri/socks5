@@ -3,8 +3,8 @@ package socks5
 
 import (
 	"context"
+	"fmt"
 	"net"
-	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -230,122 +230,83 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	s.logger.Info(ctx, "start of udp datagram forwarding")
 
-	input := make(chan *packetInfo, s.config.lenPacketQueue)
-	output := make(chan *packetInfo, s.config.lenPacketQueue)
+	dstAddresses := make(map[string]*packetInfo)
 
-	var wg sync.WaitGroup
+	for conn.isActive() {
+		datagram := make([]byte, 1500)
 
-	wg.Add(s.config.workerPool + 2)
+		n, clientAddress, err := packetConn.ReadFrom(datagram)
+		if err != nil {
+			if !isClosedListenerError(err) {
+				s.logger.Error(ctx, "packetConn.ReadFrom")
+			}
+			continue
+		}
 
-	go s.readFromPacketConn(ctx, &wg, conn, packetConn, input)
+		if conn.equalAddresses(clientAddress) {
+			payload, err := decode(datagram[:n])
+			if err != nil {
+				s.logger.Error(ctx, "decode(datagram[:n")
+				continue
+			}
 
-	for range s.config.workerPool {
-		go s.servePackets(ctx, &wg, conn, input, output)
+			address, err := net.ResolveUDPAddr("udp", payload.address.String())
+			if err != nil {
+				s.logger.Error(ctx, "net.ResolveUDPAddr")
+				continue
+			}
+
+			fmt.Println("resolve: ", address)
+
+			if _, err := packetConn.WriteTo(payload.data, address); err != nil {
+				if !isClosedListenerError(err) {
+					s.logger.Error(ctx, "packetConn.WriteTo")
+				}
+				continue
+			}
+
+			dstAddresses[address.String()] = &packetInfo{
+				clientAddress: clientAddress,
+				dstAddress:    addr,
+			}
+		}
+
+		if packetInfo, ok := dstAddresses[clientAddress.String()]; ok {
+			fmt.Println("receive: ", clientAddress)
+			delete(dstAddresses, clientAddress.String())
+
+			address := packetInfo.dstAddress
+
+			data := []byte{
+				0x00, // Reserved byte
+				0x00, // Reserved byte
+				0x00, // Current fragment number
+				address.Type,
+			}
+
+			switch address.Type {
+			case addressTypeIPv4:
+				data = append(data, address.IP.To4()...)
+			case addressTypeFQDN:
+				data = append(data, address.DomainLen)
+				data = append(data, address.Domain...)
+			case addressTypeIPv6:
+				data = append(data, address.IP.To16()...)
+			}
+
+			data = append(data, address.Port...)
+			data = append(data, datagram[:n]...)
+
+			if _, err := packetConn.WriteTo(data, packetInfo.clientAddress); err != nil {
+				if !isClosedListenerError(err) {
+					s.logger.Error(ctx, "packetConn.WriteTo")
+					continue
+				}
+			}
+		}
 	}
-
-	go s.writeToPacketConn(ctx, &wg, conn, packetConn, output)
-
-	wg.Wait()
 
 	s.logger.Info(ctx, "udp datagram forwarding complete")
-}
-
-func (s *Server) readFromPacketConn(ctx context.Context, wg *sync.WaitGroup, conn *connection, packetConn net.PacketConn, input chan<- *packetInfo) {
-	for conn.isActive() {
-		packet, err := readFromPacketConn(packetConn, s.bytePool)
-		if err != nil {
-			if !isClosedListenerError(err) {
-				s.logger.Error(ctx, "error read packet from udp connection: "+err.Error())
-			}
-
-			continue
-		}
-
-		if !conn.equalAddresses(packet.clientAddress) {
-			continue
-		}
-
-		if ok := writeToQueue(input, packet); !ok {
-			s.logger.Warn(ctx, "udp input queue is full")
-		}
-	}
-
-	wg.Done()
-}
-
-func (s *Server) servePackets(ctx context.Context, wg *sync.WaitGroup, conn *connection, input <-chan *packetInfo, output chan<- *packetInfo) {
-	for conn.isActive() {
-		packet, ok := readFromQueue(input)
-		if !ok {
-			continue
-		}
-
-		payload, err := packet.decode()
-		if err != nil {
-			s.logger.Error(ctx, "error packet decode: "+err.Error())
-			continue
-		}
-
-		payload.data, err = s.sendPacketData(ctx, payload.address, payload.data)
-		if err != nil {
-			s.logger.Error(ctx, "failed to send packet data: "+err.Error())
-			continue
-		}
-
-		packet.encode(payload)
-
-		if ok := writeToQueue(output, packet); !ok {
-			s.logger.Warn(ctx, "udp output queue is full")
-		}
-	}
-
-	wg.Done()
-}
-
-func (s *Server) writeToPacketConn(ctx context.Context, wg *sync.WaitGroup, conn *connection, packetConn net.PacketConn, output <-chan *packetInfo) {
-	for conn.isActive() {
-		packet, ok := readFromQueue(output)
-		if !ok {
-			continue
-		}
-
-		if err := writeToPacketConn(packetConn, packet); err != nil {
-			if !isClosedListenerError(err) {
-				s.logger.Error(ctx, "error write packet to udp connection: "+err.Error())
-			}
-		}
-	}
-
-	wg.Done()
-}
-
-func (s *Server) sendPacketData(ctx context.Context, addr *address, data []byte) ([]byte, error) {
-	target, err := s.driver.Dial("udp", addr.String())
-	if err != nil {
-		return nil, err
-	}
-	defer target.Close()
-
-	setConnTimeouts(target, s.config.packetConnTimeouts)
-
-	n, err := target.Write(data)
-	if err != nil {
-		return nil, err
-	}
-
-	s.metrics.UploadBytes(ctx, int64(n))
-
-	response := s.bytePool.getBytes()
-	defer s.bytePool.putBytes(response)
-
-	n, err = target.Read(response)
-	if err != nil {
-		return nil, err
-	}
-
-	s.metrics.DownloadBytes(ctx, int64(n))
-
-	return append(make([]byte, 0, n), response[:n]...), nil
 }
 
 func (s *Server) replyRequestWithError(ctx context.Context, conn *connection, err error, addr *address) {
