@@ -1,4 +1,4 @@
-module github.com/JC5LZiy3HVfV5ux/socks5
+module github.com/TuanKiri/socks5
 
 go 1.22
 

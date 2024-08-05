@@ -1,6 +1,6 @@
 [submodule "assets"]
 	path = assets
-	url = https://github.com/JC5LZiy3HVfV5ux/socks5-assets.git
+	url = https://github.com/TuanKiri/socks5-assets.git
 [submodule "examples/simple-socks5-proxy"]
 	path = examples/simple-socks5-proxy
-	url = https://github.com/JC5LZiy3HVfV5ux/simple-socks5-proxy
+	url = https://github.com/TuanKiri/simple-socks5-proxy
