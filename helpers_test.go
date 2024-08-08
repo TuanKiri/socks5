@@ -89,6 +89,10 @@ func (d testTLSDriver) ListenPacket(network, address string) (net.PacketConn, er
 	return nil, nil
 }
 
+func (d testTLSDriver) Resolve(network, address string) (net.Addr, error) {
+	return nil, nil
+}
+
 func listenAndServeTLS(address string, handler http.Handler) error {
 	server := http.Server{
 		Addr: address,

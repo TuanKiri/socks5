@@ -201,7 +201,7 @@ func (s *Server) connect(ctx context.Context, conn *connection, addr *address) {
 }
 
 func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *address) {
-	l, err := s.driver.ListenPacket("udp", net.JoinHostPort(s.config.host, "0"))
+	packetConn, err := s.driver.ListenPacket("udp", net.JoinHostPort(s.config.host, "0"))
 	if err != nil {
 		s.replyRequestWithError(ctx, conn, err, addr)
 
@@ -210,11 +210,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 	}
 
 	conn.onClose(func() {
-		if l == nil {
-			return
-		}
-
-		if err := l.Close(); err != nil {
+		if err := packetConn.Close(); err != nil {
 			s.logger.Error(ctx, "error close udp listener: "+err.Error())
 		}
 	})
@@ -223,7 +219,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	var port port
 
-	port.fromAddress(l.LocalAddr())
+	port.fromAddress(packetConn.LocalAddr())
 
 	s.replyRequest(ctx, conn, connectionSuccessful, &address{
 		Type: addressTypeIPv4,
@@ -231,159 +227,44 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 		Port: port,
 	})
 
+	buff := s.bytePool.get()
+	defer s.bytePool.put(buff)
+
 	s.logger.Info(ctx, "start of udp datagram forwarding")
 
-	// While tcp connection is active
 	for conn.isActive() {
-		// The actual limit for the data length, which is imposed by the underlying IPv4 protocol, is 65507 bytes
-		packet := make([]byte, 65507)
-
-		n, clientAddress, err := l.ReadFrom(packet)
+		n, clientAddress, err := packetConn.ReadFrom(buff)
 		if err != nil {
 			if !isClosedListenerError(err) {
-				s.logger.Error(ctx, "error read packet from udp connection: "+err.Error())
+				s.logger.Error(ctx, "failed to read from packet connection: "+err.Error())
+			}
+			continue
+		}
+
+		if conn.equalAddresses(clientAddress) {
+			var packet packet
+
+			if err := packet.decode(buff[:n]); err != nil {
+				s.logger.Error(ctx, "failed to unpack packet: "+err.Error())
+				continue
 			}
 
-			continue
-		}
+			destAddress, err := s.driver.Resolve("udp", packet.address.String())
+			if err != nil {
+				s.logger.Error(ctx, "failed to resolve target UDP address: "+err.Error())
+				continue
+			}
 
-		if !conn.equalAddresses(clientAddress) {
-			continue
+			if _, err := packetConn.WriteTo(packet.payload, destAddress); err != nil {
+				if !isClosedListenerError(err) {
+					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
+				}
+				continue
+			}
 		}
-
-		go s.servePacketConn(ctx, newPacketConn(l, clientAddress, packet[:n]))
 	}
 
 	s.logger.Info(ctx, "udp datagram forwarding complete")
-}
-
-func (s *Server) servePacketConn(ctx context.Context, conn *packetConn) {
-	// Reserved 2 bytes: 0x00, 0x00
-	if _, err := conn.read(make([]byte, 2)); err != nil {
-		s.logger.Error(ctx, "failed to read reserved bytes from packet: "+err.Error())
-		return
-	}
-
-	// Current fragment number
-	frag, err := conn.readByte()
-	if err != nil {
-		s.logger.Error(ctx, "failed to read current fragment number from packet: "+err.Error())
-		return
-	}
-
-	// If not support fragmentation must drop any datagram whose FRAG field is other than 0x00
-	if frag != 0x00 {
-		return
-	}
-
-	var addr address
-
-	addr.Type, err = conn.readByte()
-	if err != nil {
-		s.logger.Error(ctx, "failed to read address type from packet: "+err.Error())
-		return
-	}
-
-	switch addr.Type {
-	case addressTypeIPv4:
-		addr.IP = make(net.IP, net.IPv4len)
-		if _, err := conn.read(addr.IP); err != nil {
-			s.logger.Error(ctx, "failed to read IPv4 address from packet: "+err.Error())
-			return
-		}
-	case addressTypeFQDN:
-		addr.DomainLen, err = conn.readByte()
-		if err != nil {
-			s.logger.Error(ctx, "failed to read domain length from packet: "+err.Error())
-			return
-		}
-
-		addr.Domain = make([]byte, addr.DomainLen)
-		if _, err := conn.read(addr.Domain); err != nil {
-			s.logger.Error(ctx, "failed to read domain from packet: "+err.Error())
-			return
-		}
-	case addressTypeIPv6:
-		addr.IP = make(net.IP, net.IPv6len)
-		if _, err := conn.read(addr.IP); err != nil {
-			s.logger.Error(ctx, "failed to read IPv6 address from packet: "+err.Error())
-			return
-		}
-	default:
-		return
-	}
-
-	addr.Port = make([]byte, 2)
-	if _, err := conn.read(addr.Port); err != nil {
-		s.logger.Error(ctx, "failed to read port from packet: "+err.Error())
-		return
-	}
-
-	if !s.rules.IsAllowDestination(ctx, addr.getDomainOrIP()) {
-		return
-	}
-
-	res, err := s.sendPacket(ctx, conn.bytes(), &addr)
-	if err != nil {
-		s.logger.Error(ctx, "failed to send packet: "+err.Error())
-		return
-	}
-
-	s.replyPacket(ctx, conn, res, &addr)
-}
-
-func (s *Server) sendPacket(ctx context.Context, data []byte, addr *address) ([]byte, error) {
-	target, err := s.driver.Dial("udp", addr.String())
-	if err != nil {
-		return nil, err
-	}
-	defer target.Close()
-
-	n, err := target.Write(data)
-	if err != nil {
-		return nil, err
-	}
-
-	s.metrics.UploadBytes(ctx, int64(n))
-
-	packet := make([]byte, 65507)
-
-	n, err = target.Read(packet)
-	if err != nil {
-		return nil, err
-	}
-
-	s.metrics.DownloadBytes(ctx, int64(n))
-
-	return packet[:n], nil
-}
-
-func (s *Server) replyPacket(ctx context.Context, conn *packetConn, packet []byte, addr *address) {
-	res := []byte{
-		0x00, // Reserved byte
-		0x00, // Reserved byte
-		0x00, // Current fragment number
-		addr.Type,
-	}
-
-	switch addr.Type {
-	case addressTypeIPv4:
-		res = append(res, addr.IP.To4()...)
-	case addressTypeFQDN:
-		res = append(res, addr.DomainLen)
-		res = append(res, addr.Domain...)
-	case addressTypeIPv6:
-		res = append(res, addr.IP.To16()...)
-	}
-
-	res = append(res, addr.Port...)
-	res = append(res, packet...)
-
-	if _, err := conn.write(res); err != nil {
-		if !isClosedListenerError(err) {
-			s.logger.Error(ctx, "error write packet to udp connection: "+err.Error())
-		}
-	}
 }
 
 func (s *Server) replyRequestWithError(ctx context.Context, conn *connection, err error, addr *address) {

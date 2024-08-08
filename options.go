@@ -31,6 +31,7 @@ type options struct {
 	allowCommands          map[byte]struct{}
 	blockListHosts         map[string]struct{}
 	allowIPs               []net.IP
+	maxPacketSize          int
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -56,8 +57,12 @@ func (o options) listenAddress() string {
 }
 
 func optsWithDefaults(opts *options) *options {
-	if opts.port == 0 {
+	if opts.port <= 0 {
 		opts.port = 1080
+	}
+
+	if opts.maxPacketSize <= 0 {
+		opts.maxPacketSize = 1500
 	}
 
 	if opts.publicIP == nil {
@@ -218,5 +223,11 @@ func WithBlockListHosts(hosts ...string) Option {
 
 	return func(o *options) {
 		o.blockListHosts = blockListHosts
+	}
+}
+
+func WithMaxPacketSize(val int) Option {
+	return func(o *options) {
+		o.maxPacketSize = val
 	}
 }
