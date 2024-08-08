@@ -68,29 +68,34 @@ func (p *packet) decode(data []byte) error {
 		return errors.New("failed to read port")
 	}
 
+	p.address = &address
+	p.payload = buffer.Bytes()
+
 	return nil
 }
 
-func (p *packet) encode(payload []byte) []byte {
-	data := []byte{
+func (p *packet) encode(data []byte) {
+	p.payload = append(p.payload,
 		0x00, // Reserved byte
 		0x00, // Reserved byte
 		0x00, // Current fragment number
 		p.address.Type,
-	}
+	)
 
 	switch p.address.Type {
 	case addressTypeIPv4:
-		data = append(data, p.address.IP.To4()...)
+		p.payload = append(p.payload, p.address.IP.To4()...)
 	case addressTypeFQDN:
-		data = append(data, p.address.DomainLen)
-		data = append(data, p.address.Domain...)
+		p.payload = append(p.payload, p.address.DomainLen)
+		p.payload = append(p.payload, p.address.Domain...)
 	case addressTypeIPv6:
-		data = append(data, p.address.IP.To16()...)
+		p.payload = append(p.payload, p.address.IP.To16()...)
 	}
 
-	data = append(data, p.address.Port...)
-	data = append(data, payload...)
+	p.payload = append(p.payload, p.address.Port...)
+	p.payload = append(p.payload, data...)
+}
 
-	return data
+func (p *packet) clear() {
+	p.payload = p.payload[:0]
 }

@@ -230,6 +230,10 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 	buff := s.bytePool.get()
 	defer s.bytePool.put(buff)
 
+	relayMapper := newUDPRelayMapper()
+
+	go relayMapper.cleanUp()
+
 	s.logger.Info(ctx, "start of udp datagram forwarding")
 
 	for conn.isActive() {
@@ -261,6 +265,22 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 				}
 				continue
 			}
+
+			packet.clear()
+
+			relayMapper.save(clientAddress, destAddress, &packet)
+		}
+
+		if sourceAddress, packet, ok := relayMapper.get(clientAddress); ok {
+			packet.encode(buff[:n])
+
+			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
+				if !isClosedListenerError(err) {
+					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
+				}
+			}
+
+			relayMapper.delete(clientAddress)
 		}
 	}
 
