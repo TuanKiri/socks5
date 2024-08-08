@@ -2,7 +2,6 @@ package socks5
 
 import (
 	"bufio"
-	"bytes"
 	"io"
 	"net"
 )
@@ -68,37 +67,7 @@ func (c *connection) keepAlive() {
 		return
 	}
 
-	c.closeFn()
-
 	close(c.done)
-}
 
-type packetConn struct {
-	net.PacketConn
-	net.Addr
-	reader *bytes.Buffer
-}
-
-func newPacketConn(conn net.PacketConn, addr net.Addr, data []byte) *packetConn {
-	return &packetConn{
-		PacketConn: conn,
-		Addr:       addr,
-		reader:     bytes.NewBuffer(data),
-	}
-}
-
-func (c *packetConn) readByte() (byte, error) {
-	return c.reader.ReadByte()
-}
-
-func (c *packetConn) read(p []byte) (int, error) {
-	return c.reader.Read(p)
-}
-
-func (c *packetConn) write(p []byte) (int, error) {
-	return c.PacketConn.WriteTo(p, c.Addr)
-}
-
-func (c *packetConn) bytes() []byte {
-	return c.reader.Bytes()
+	c.closeFn()
 }
