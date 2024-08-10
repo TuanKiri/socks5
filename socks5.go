@@ -230,9 +230,9 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 	buff := s.bytePool.get()
 	defer s.bytePool.put(buff)
 
-	relayMapper := newUDPRelayMapper()
+	natTable := newNatTable()
 
-	go relayMapper.cleanUp()
+	go natTable.cleanUp()
 
 	s.logger.Info(ctx, "start of udp datagram forwarding")
 
@@ -268,10 +268,10 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 			packet.clear()
 
-			relayMapper.save(clientAddress, destAddress, &packet)
+			natTable.set(clientAddress, destAddress, &packet)
 		}
 
-		if sourceAddress, packet, ok := relayMapper.get(clientAddress); ok {
+		if sourceAddress, packet, ok := natTable.get(clientAddress); ok {
 			packet.encode(buff[:n])
 
 			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
@@ -280,7 +280,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 				}
 			}
 
-			relayMapper.delete(clientAddress)
+			natTable.delete(clientAddress)
 		}
 	}
 
