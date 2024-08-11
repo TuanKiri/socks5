@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/proxy"
 
@@ -16,7 +15,7 @@ import (
 func TestProxyConnect(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]struct {
+	testCases := map[string]struct {
 		proxyAddress      string
 		proxyOpts         []socks5.Option
 		destinationUrl    string
@@ -133,40 +132,35 @@ func TestProxyConnect(t *testing.T) {
 			proxyOpts: []socks5.Option{
 				socks5.WithLogger(socks5.NopLogger),
 				socks5.WithPort(1160),
-				socks5.WithDriver(&testTLSDriver{
-					tlsConfig: &tls.Config{
-						Certificates: []tls.Certificate{cert},
-					},
-				}),
 				socks5.WithBlockListHosts(
 					"www.google.com",
 				),
 			},
-			destinationUrl: "https://www.google.com",
-			errString: "Get \"https://www.google.com\": socks connect " +
-				"tcp 127.0.0.1:1160->www.google.com:443: unknown error connection not allowed by ruleset",
+			destinationUrl: "http://www.google.com",
+			errString: "Get \"http://www.google.com\": socks connect " +
+				"tcp 127.0.0.1:1160->www.google.com:80: unknown error connection not allowed by ruleset",
 		},
 	}
 
-	for name, tc := range cases {
+	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			go runProxy(tc.proxyOpts)
 
 			// Wait for socks5 proxy to start
 			time.Sleep(100 * time.Millisecond)
 
-			client, err := setupClient(tc.proxyAddress, tc.clientCredentials)
-			assert.NoError(t, err)
+			client, err := newHttpClient(tc.proxyAddress, tc.clientCredentials)
+			require.NoError(t, err)
 
-			resp, err := client.Get(tc.destinationUrl)
+			response, err := client.Get(tc.destinationUrl)
 			if err != nil {
 				require.EqualError(t, err, tc.errString)
 				return
 			}
-			defer resp.Body.Close()
+			defer response.Body.Close()
 
-			body, err := io.ReadAll(resp.Body)
-			assert.NoError(t, err)
+			body, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
 
 			require.Equal(t, tc.wait, body)
 		})
