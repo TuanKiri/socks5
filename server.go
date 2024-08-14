@@ -14,6 +14,8 @@ type config struct {
 	getPasswordTimeout time.Duration
 	authMethods        map[byte]struct{}
 	publicIP           net.IP
+	ttlPacket          time.Duration
+	natCleanupPeriod   time.Duration
 }
 
 type Server struct {
@@ -47,6 +49,8 @@ func New(opts ...Option) *Server {
 			getPasswordTimeout: options.getPasswordTimeout,
 			authMethods:        options.authMethods(),
 			publicIP:           options.publicIP,
+			ttlPacket:          options.ttlPacket,
+			natCleanupPeriod:   options.natCleanupPeriod,
 		},
 		logger:   options.logger,
 		store:    options.store,

@@ -6,38 +6,36 @@ import (
 	"time"
 )
 
-type natPacket struct {
+type natEntry struct {
 	src       net.Addr
 	packet    *packet
 	timestamp time.Time
 }
 
 type natTable struct {
-	sync.RWMutex
-	table map[string]*natPacket
+	mutex sync.RWMutex
+	table map[string]*natEntry
 }
 
 func newNatTable() *natTable {
-	return &natTable{
-		table: make(map[string]*natPacket),
-	}
+	return &natTable{table: make(map[string]*natEntry)}
 }
 
-func (m *natTable) set(src, dst net.Addr, packet *packet) {
-	m.Lock()
-	m.table[dst.String()] = &natPacket{
+func (n *natTable) set(src, dst net.Addr, packet *packet) {
+	n.mutex.Lock()
+	n.table[dst.String()] = &natEntry{
 		src:       src,
 		packet:    packet,
-		timestamp: time.Now().Add(15 * time.Second),
+		timestamp: time.Now(),
 	}
-	m.Unlock()
+	n.mutex.Unlock()
 }
 
-func (m *natTable) get(dst net.Addr) (net.Addr, *packet, bool) {
-	m.RLock()
-	defer m.RUnlock()
+func (n *natTable) get(dst net.Addr) (net.Addr, *packet, bool) {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
 
-	val, ok := m.table[dst.String()]
+	val, ok := n.table[dst.String()]
 	if !ok {
 		return nil, nil, ok
 	}
@@ -45,20 +43,39 @@ func (m *natTable) get(dst net.Addr) (net.Addr, *packet, bool) {
 	return val.src, val.packet, ok
 }
 
-func (m *natTable) delete(dst net.Addr) {
-	m.Lock()
-	delete(m.table, dst.String())
-	m.Unlock()
+func (n *natTable) delete(dst net.Addr) {
+	n.mutex.Lock()
+	delete(n.table, dst.String())
+	n.mutex.Unlock()
 }
 
-func (m *natTable) cleanUp() {
-	for now := range time.Tick(1 * time.Minute) {
-		m.Lock()
-		for key, val := range m.table {
-			if now.After(val.timestamp) {
-				delete(m.table, key)
+func (n *natTable) Cleanup(period, ttl time.Duration) func() {
+	if period <= 0 || ttl <= 0 {
+		return func() {}
+	}
+
+	ticker := time.NewTicker(period)
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				n.mutex.Lock()
+				for key, val := range n.table {
+					if time.Since(val.timestamp) >= ttl {
+						delete(n.table, key)
+					}
+				}
+				n.mutex.Unlock()
 			}
 		}
-		m.Unlock()
+	}()
+
+	return func() {
+		close(done)
 	}
 }

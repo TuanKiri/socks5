@@ -32,6 +32,8 @@ type options struct {
 	blockListHosts         map[string]struct{}
 	allowIPs               []net.IP
 	maxPacketSize          int
+	ttlPacket              time.Duration
+	natCleanupPeriod       time.Duration
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -229,5 +231,17 @@ func WithBlockListHosts(hosts ...string) Option {
 func WithMaxPacketSize(val int) Option {
 	return func(o *options) {
 		o.maxPacketSize = val
+	}
+}
+
+func WithTTLPacket(val time.Duration) Option {
+	return func(o *options) {
+		o.ttlPacket = val
+	}
+}
+
+func WithNatCleanupPeriod(val time.Duration) Option {
+	return func(o *options) {
+		o.natCleanupPeriod = val
 	}
 }
