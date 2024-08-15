@@ -49,7 +49,7 @@ func (n *natTable) delete(dst net.Addr) {
 	n.mutex.Unlock()
 }
 
-func (n *natTable) Cleanup(period, ttl time.Duration) func() {
+func (n *natTable) cleanup(period, ttl time.Duration) func() {
 	if period <= 0 || ttl <= 0 {
 		return func() {}
 	}

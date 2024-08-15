@@ -112,7 +112,7 @@ func listenAndServeTLS(address string, handler http.Handler) error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func runProxy(opts []socks5.Option) {
+func runProxy(opts ...socks5.Option) {
 	srv := socks5.New(opts...)
 
 	if err := srv.ListenAndServe(); err != nil {

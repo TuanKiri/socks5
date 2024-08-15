@@ -232,7 +232,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 	natTable := newNatTable()
 
-	stop := natTable.Cleanup(s.config.natCleanupPeriod, s.config.ttlPacket)
+	stop := natTable.cleanup(s.config.natCleanupPeriod, s.config.ttlPacket)
 	defer stop()
 
 	s.logger.Info(ctx, "start of udp datagram forwarding")
@@ -267,7 +267,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 				continue
 			}
 
-			packet.clear()
+			packet.payload.reset()
 
 			natTable.set(clientAddress, destAddress, &packet)
 		}

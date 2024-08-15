@@ -144,7 +144,7 @@ func TestProxyConnect(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			go runProxy(tc.proxyOpts)
+			go runProxy(tc.proxyOpts...)
 
 			// Wait for socks5 proxy to start
 			time.Sleep(100 * time.Millisecond)

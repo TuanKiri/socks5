@@ -6,9 +6,15 @@ import (
 	"net"
 )
 
+type payload []byte
+
+func (p *payload) reset() {
+	*p = nil
+}
+
 type packet struct {
 	address *address
-	payload []byte
+	payload payload
 }
 
 func (p *packet) decode(data []byte) error {
@@ -75,12 +81,12 @@ func (p *packet) decode(data []byte) error {
 }
 
 func (p *packet) encode(data []byte) {
-	p.payload = append(p.payload,
+	p.payload = []byte{
 		0x00, // Reserved byte
 		0x00, // Reserved byte
 		0x00, // Current fragment number
 		p.address.Type,
-	)
+	}
 
 	switch p.address.Type {
 	case addressTypeIPv4:
@@ -94,8 +100,4 @@ func (p *packet) encode(data []byte) {
 
 	p.payload = append(p.payload, p.address.Port...)
 	p.payload = append(p.payload, data...)
-}
-
-func (p *packet) clear() {
-	p.payload = p.payload[:0]
 }
