@@ -246,6 +246,19 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 			continue
 		}
 
+		if sourceAddress, packet, ok := natTable.get(clientAddress); ok {
+			packet.encode(buff[:n])
+
+			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
+				if !isClosedListenerError(err) {
+					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
+				}
+			}
+
+			natTable.delete(clientAddress)
+			continue
+		}
+
 		if conn.equalAddresses(clientAddress) {
 			var packet packet
 
@@ -270,18 +283,6 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 			packet.payload.reset()
 
 			natTable.set(clientAddress, destAddress, &packet)
-		}
-
-		if sourceAddress, packet, ok := natTable.get(clientAddress); ok {
-			packet.encode(buff[:n])
-
-			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
-				if !isClosedListenerError(err) {
-					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
-				}
-			}
-
-			natTable.delete(clientAddress)
 		}
 	}
 

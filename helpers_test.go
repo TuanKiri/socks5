@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"golang.org/x/net/proxy"
 
@@ -164,6 +165,8 @@ func echoPacketServer(address string) error {
 			log.Printf("error reading: %v", err)
 			continue
 		}
+
+		packetConn.SetWriteDeadline(time.Now().Add(200 * time.Millisecond))
 
 		_, err = packetConn.WriteTo(buf[:n], clientAddress)
 		if err != nil {
