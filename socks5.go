@@ -249,6 +249,8 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 		if sourceAddress, packet, ok := natTable.get(clientAddress); ok {
 			packet.encode(buff[:n])
 
+			s.metrics.DownloadBytes(ctx, packet.payload.len())
+
 			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
 				if !isClosedListenerError(err) {
 					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
@@ -267,11 +269,17 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 				continue
 			}
 
+			if !s.rules.IsAllowDestination(ctx, packet.address.getDomainOrIP()) {
+				continue
+			}
+
 			destAddress, err := s.driver.Resolve("udp", packet.address.String())
 			if err != nil {
 				s.logger.Error(ctx, "failed to resolve target UDP address: "+err.Error())
 				continue
 			}
+
+			s.metrics.UploadBytes(ctx, packet.payload.len())
 
 			if _, err := packetConn.WriteTo(packet.payload, destAddress); err != nil {
 				if !isClosedListenerError(err) {

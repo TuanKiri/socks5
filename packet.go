@@ -12,6 +12,10 @@ func (p *payload) reset() {
 	*p = nil
 }
 
+func (p payload) len() int64 {
+	return int64(len(p))
+}
+
 type packet struct {
 	address *address
 	payload payload
