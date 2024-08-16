@@ -14,6 +14,7 @@ type config struct {
 	getPasswordTimeout time.Duration
 	authMethods        map[byte]struct{}
 	publicIP           net.IP
+	packetWriteTimeout time.Duration
 	ttlPacket          time.Duration
 	natCleanupPeriod   time.Duration
 }
@@ -49,6 +50,7 @@ func New(opts ...Option) *Server {
 			getPasswordTimeout: options.getPasswordTimeout,
 			authMethods:        options.authMethods(),
 			publicIP:           options.publicIP,
+			packetWriteTimeout: options.packetWriteTimeout,
 			ttlPacket:          options.ttlPacket,
 			natCleanupPeriod:   options.natCleanupPeriod,
 		},
@@ -118,23 +120,12 @@ func (s *Server) serve(conn net.Conn) {
 		return
 	}
 
-	s.setConnDeadline(conn)
+	conn.SetReadDeadline(newDeadline(s.config.readTimeout))
+	conn.SetWriteDeadline(newDeadline(s.config.writeTimeout))
 
 	ctx := contextWithRemoteAddress(context.Background(), remoteAddr)
 
 	s.handshake(ctx, newConnection(conn))
-}
-
-func (s *Server) setConnDeadline(conn net.Conn) {
-	currentTime := time.Now().Local()
-
-	if s.config.readTimeout != 0 {
-		conn.SetReadDeadline(currentTime.Add(s.config.readTimeout))
-	}
-
-	if s.config.writeTimeout != 0 {
-		conn.SetWriteDeadline(currentTime.Add(s.config.writeTimeout))
-	}
 }
 
 func (s *Server) isActive() bool {
@@ -154,4 +145,12 @@ func closeListenerFn(l net.Listener) func() error {
 
 		return l.Close()
 	}
+}
+
+func newDeadline(d time.Duration) time.Time {
+	if d > 0 {
+		return time.Now().Local().Add(d)
+	}
+
+	return time.Time{}
 }

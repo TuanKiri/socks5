@@ -251,6 +251,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 			s.metrics.DownloadBytes(ctx, packet.payload.len())
 
+			packetConn.SetWriteDeadline(newDeadline(s.config.packetWriteTimeout))
 			if _, err := packetConn.WriteTo(packet.payload, sourceAddress); err != nil {
 				if !isClosedListenerError(err) {
 					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())
@@ -281,6 +282,7 @@ func (s *Server) udpAssociate(ctx context.Context, conn *connection, addr *addre
 
 			s.metrics.UploadBytes(ctx, packet.payload.len())
 
+			packetConn.SetWriteDeadline(newDeadline(s.config.packetWriteTimeout))
 			if _, err := packetConn.WriteTo(packet.payload, destAddress); err != nil {
 				if !isClosedListenerError(err) {
 					s.logger.Error(ctx, "failed writing to packet connection: "+err.Error())

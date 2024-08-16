@@ -32,6 +32,7 @@ type options struct {
 	blockListHosts         map[string]struct{}
 	allowIPs               []net.IP
 	maxPacketSize          int
+	packetWriteTimeout     time.Duration
 	ttlPacket              time.Duration
 	natCleanupPeriod       time.Duration
 	logger                 Logger
@@ -225,6 +226,12 @@ func WithBlockListHosts(hosts ...string) Option {
 
 	return func(o *options) {
 		o.blockListHosts = blockListHosts
+	}
+}
+
+func WithPacketWriteTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.packetWriteTimeout = val
 	}
 }
 
