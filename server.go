@@ -139,10 +139,6 @@ func (s *Server) isActive() bool {
 
 func closeListenerFn(l net.Listener) func() error {
 	return func() error {
-		if l == nil {
-			return nil
-		}
-
 		return l.Close()
 	}
 }
