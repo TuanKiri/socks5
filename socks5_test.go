@@ -3,6 +3,7 @@ package socks5_test
 import (
 	"crypto/tls"
 	"io"
+	"net"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 func TestProxyConnect(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]struct {
+	testCases := map[string]struct {
 		proxyAddress      string
 		proxyOpts         []socks5.Option
 		destinationUrl    string
@@ -133,42 +134,154 @@ func TestProxyConnect(t *testing.T) {
 			proxyOpts: []socks5.Option{
 				socks5.WithLogger(socks5.NopLogger),
 				socks5.WithPort(1160),
-				socks5.WithDriver(&testTLSDriver{
-					tlsConfig: &tls.Config{
-						Certificates: []tls.Certificate{cert},
-					},
-				}),
 				socks5.WithBlockListHosts(
 					"www.google.com",
 				),
 			},
-			destinationUrl: "https://www.google.com",
-			errString: "Get \"https://www.google.com\": socks connect " +
-				"tcp 127.0.0.1:1160->www.google.com:443: unknown error connection not allowed by ruleset",
+			destinationUrl: "http://www.google.com",
+			errString: "Get \"http://www.google.com\": socks connect " +
+				"tcp 127.0.0.1:1160->www.google.com:80: unknown error connection not allowed by ruleset",
 		},
 	}
 
-	for name, tc := range cases {
+	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			go runProxy(tc.proxyOpts)
+			go runProxy(tc.proxyOpts...)
 
 			// Wait for socks5 proxy to start
 			time.Sleep(100 * time.Millisecond)
 
-			client, err := setupClient(tc.proxyAddress, tc.clientCredentials)
-			assert.NoError(t, err)
+			client, err := newHttpClient(tc.proxyAddress, tc.clientCredentials)
+			require.NoError(t, err)
 
-			resp, err := client.Get(tc.destinationUrl)
+			response, err := client.Get(tc.destinationUrl)
 			if err != nil {
 				require.EqualError(t, err, tc.errString)
 				return
 			}
-			defer resp.Body.Close()
+			defer response.Body.Close()
 
-			body, err := io.ReadAll(resp.Body)
-			assert.NoError(t, err)
+			body, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
 
-			require.Equal(t, tc.wait, body)
+			assert.Equal(t, tc.wait, body)
 		})
+	}
+}
+
+func TestProxyUDPAssociate(t *testing.T) {
+	testCase := struct {
+		handshake     []byte
+		response      []byte
+		request       []byte
+		acceptRequest []byte
+		packets       map[string][]byte
+	}{
+		handshake: []byte{
+			0x05, // version: 5
+			0x01, // number of methods: 1
+			0x00, // method: no authentication required
+		},
+		response: []byte{
+			0x05, // version: 5
+			0x00, // method: no authentication required
+		},
+		request: []byte{
+			0x05,                   // version: 5
+			0x03,                   // command: udp associate
+			0x00,                   // reserved byte
+			0x01,                   // address type: Ipv4
+			0x00, 0x00, 0x00, 0x00, // address: 0.0.0.0
+			0xB6, 0xD9, // port: 46809
+		},
+		acceptRequest: []byte{
+			0x05,                   // version: 5
+			0x00,                   // status: connection successful
+			0x00,                   // reserved byte
+			0x01,                   // address type: Ipv4
+			0x7F, 0x00, 0x00, 0x01, // address: 127.0.0.1
+			0xB6, 0xD9, // port: 46809
+		},
+		packets: map[string][]byte{
+			"IPv4_address": {
+				0x00, 0x00, // reserved 2 bytes
+				0x00,                   // current fragment number: 0
+				0x01,                   // address type: Ipv4
+				0x7F, 0x00, 0x00, 0x01, // address: 127.0.0.1
+				0x1D, 0x14, // port: 7444
+				0x48, 0x45, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x4F, 0x52, 0x6C, 0x64, // payload: HEllo WORld
+			},
+			"FQDN_address": {
+				0x00, 0x00, // reserved 2 bytes
+				0x00,                                                 // current fragment number: 0
+				0x03,                                                 // address type: FQDN
+				0x09,                                                 // domain len: 9
+				0x6c, 0x6f, 0x63, 0x61, 0x6c, 0x68, 0x6f, 0x73, 0x74, // address: localhost
+				0x1D, 0x14, // port: 7444
+				0x48, 0x45, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x4F, 0x52, 0x6C, 0x64, // payload: HEllo WORld
+			},
+			"IPv6_address": {
+				0x00, 0x00, // reserved 2 bytes
+				0x00,                                                                                           // current fragment number: 0
+				0x04,                                                                                           // address type: IPv6
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // address: ::1
+				0x1D, 0x14, // port: 7444
+				0x48, 0x45, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x4F, 0x52, 0x6C, 0x64, // payload: HEllo WORld
+			},
+		},
+	}
+
+	go runProxy(
+		socks5.WithLogger(socks5.NopLogger),
+	)
+
+	// Wait for socks5 proxy to start
+	time.Sleep(100 * time.Millisecond)
+
+	conn, err := net.Dial("tcp", ":1080")
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		conn.Close()
+	})
+
+	_, err = conn.Write(testCase.handshake)
+	require.NoError(t, err)
+
+	response := make([]byte, 2)
+	_, err = conn.Read(response)
+	require.NoError(t, err)
+
+	require.Equal(t, testCase.response, response)
+
+	_, err = conn.Write(testCase.request)
+	require.NoError(t, err)
+
+	acceptRequest := make([]byte, 10)
+	_, err = conn.Read(acceptRequest)
+	require.NoError(t, err)
+
+	require.Equal(t, testCase.acceptRequest, acceptRequest)
+
+	udpConn, err := net.Dial("udp", ":46809")
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		udpConn.Close()
+	})
+
+	for name, packet := range testCase.packets {
+		udpConn.SetWriteDeadline(time.Now().Add(200 * time.Millisecond))
+
+		_, err := udpConn.Write(packet)
+		require.NoErrorf(t, err, name)
+
+		udpConn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
+		response := make([]byte, len(packet))
+		_, err = udpConn.Read(response)
+		require.NoErrorf(t, err, name)
+
+		assert.Equalf(t, packet, response, name)
 	}
 }

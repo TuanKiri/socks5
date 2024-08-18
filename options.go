@@ -31,6 +31,10 @@ type options struct {
 	allowCommands          map[byte]struct{}
 	blockListHosts         map[string]struct{}
 	allowIPs               []net.IP
+	maxPacketSize          int
+	packetWriteTimeout     time.Duration
+	ttlPacket              time.Duration
+	natCleanupPeriod       time.Duration
 	logger                 Logger
 	store                  Store
 	driver                 Driver
@@ -56,8 +60,12 @@ func (o options) listenAddress() string {
 }
 
 func optsWithDefaults(opts *options) *options {
-	if opts.port == 0 {
+	if opts.port <= 0 {
 		opts.port = 1080
+	}
+
+	if opts.maxPacketSize <= 0 {
+		opts.maxPacketSize = 1500
 	}
 
 	if opts.publicIP == nil {
@@ -119,18 +127,23 @@ func WithPort(val int) Option {
 	}
 }
 
+// WithPublicIP sets an IP address that is visible on the external Internet,
+// accessible to users outside the local network and will be sent to clients in
+// response to a connection request.
 func WithPublicIP(val net.IP) Option {
 	return func(o *options) {
 		o.publicIP = val
 	}
 }
 
+// WithReadTimeout sets the read timeout for tcp connection.
 func WithReadTimeout(val time.Duration) Option {
 	return func(o *options) {
 		o.readTimeout = val
 	}
 }
 
+// WithWriteTimeout sets the write timeout for tcp connection.
 func WithWriteTimeout(val time.Duration) Option {
 	return func(o *options) {
 		o.writeTimeout = val
@@ -218,5 +231,38 @@ func WithBlockListHosts(hosts ...string) Option {
 
 	return func(o *options) {
 		o.blockListHosts = blockListHosts
+	}
+}
+
+// WithPacketWriteTimeout sets the timeout for waiting to write a packet to the remote host.
+func WithPacketWriteTimeout(val time.Duration) Option {
+	return func(o *options) {
+		o.packetWriteTimeout = val
+	}
+}
+
+// WithMaxPacketSize sets the maximum size in bytes for the datagram to be read from the socket.
+func WithMaxPacketSize(val int) Option {
+	return func(o *options) {
+		o.maxPacketSize = val
+	}
+}
+
+// WithTTLPacket sets how long the packet will stay in the table
+// that links the sender of the packet to the remote host it was meant for.
+// Nat cleanup period must be greater than 0.
+func WithTTLPacket(val time.Duration) Option {
+	return func(o *options) {
+		o.ttlPacket = val
+	}
+}
+
+// WithNatCleanupPeriod sets the period when the table that links the
+// packets from the sender to the remote host will be cleaned.
+// It makes sense if there's no time limit on the TCP connection.
+// TTL of the packet must be greater than 0.
+func WithNatCleanupPeriod(val time.Duration) Option {
+	return func(o *options) {
+		o.natCleanupPeriod = val
 	}
 }

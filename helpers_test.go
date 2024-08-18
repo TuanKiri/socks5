@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"golang.org/x/net/proxy"
 
@@ -42,11 +43,12 @@ lPQTC4uW7AAywREZ2ekd8XUX8JwdTJHmPg==
 var cert tls.Certificate
 
 func init() {
-	c, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
+	var err error
+
+	cert, err = tls.X509KeyPair([]byte(certPem), []byte(keyPem))
 	if err != nil {
-		panic(err)
+		log.Fatalf("error parsing public/private key pair: %v", err)
 	}
-	cert = c
 
 	mux := http.NewServeMux()
 
@@ -56,13 +58,19 @@ func init() {
 
 	go func() {
 		if err := http.ListenAndServe(":5444", mux); err != nil {
-			log.Fatalf("runRemoteServer: %v", err)
+			log.Fatalf("error running remote http server: %v", err)
 		}
 	}()
 
 	go func() {
 		if err := listenAndServeTLS(":6444", mux); err != nil {
-			log.Fatalf("runRemoteServer: %v", err)
+			log.Fatalf("error running remote https server: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := echoPacketServer(":7444"); err != nil {
+			log.Fatalf("error running echo packet server: %v", err)
 		}
 	}()
 }
@@ -89,6 +97,10 @@ func (d testTLSDriver) ListenPacket(network, address string) (net.PacketConn, er
 	return nil, nil
 }
 
+func (d testTLSDriver) Resolve(network, address string) (net.Addr, error) {
+	return nil, nil
+}
+
 func listenAndServeTLS(address string, handler http.Handler) error {
 	server := http.Server{
 		Addr: address,
@@ -101,15 +113,15 @@ func listenAndServeTLS(address string, handler http.Handler) error {
 	return server.ListenAndServeTLS("", "")
 }
 
-func runProxy(opts []socks5.Option) {
+func runProxy(opts ...socks5.Option) {
 	srv := socks5.New(opts...)
 
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("runProxy: %v", err)
+		log.Fatalf("error running socks5 proxy server: %v", err)
 	}
 }
 
-func setupClient(proxyAddress string, auth *proxy.Auth) (*http.Client, error) {
+func newHttpClient(proxyAddress string, auth *proxy.Auth) (*http.Client, error) {
 	socksProxy, err := proxy.SOCKS5(
 		"tcp",
 		proxyAddress,
@@ -136,4 +148,30 @@ func setupClient(proxyAddress string, auth *proxy.Auth) (*http.Client, error) {
 			DialTLS: tlsSocksProxy.Dial,
 		},
 	}, nil
+}
+
+func echoPacketServer(address string) error {
+	packetConn, err := net.ListenPacket("udp", address)
+	if err != nil {
+		return err
+	}
+	defer packetConn.Close()
+
+	buf := make([]byte, 1024)
+
+	for {
+		n, clientAddress, err := packetConn.ReadFrom(buf)
+		if err != nil {
+			log.Printf("error reading: %v", err)
+			continue
+		}
+
+		packetConn.SetWriteDeadline(time.Now().Add(200 * time.Millisecond))
+
+		_, err = packetConn.WriteTo(buf[:n], clientAddress)
+		if err != nil {
+			log.Printf("error writing: %v", err)
+			continue
+		}
+	}
 }
