@@ -36,14 +36,14 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/TuanKiri/socks5"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	srv := socks5.New()

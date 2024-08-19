@@ -2,5 +2,5 @@
 	path = assets
 	url = https://github.com/TuanKiri/socks5-assets.git
 [submodule "examples/simple-socks5-proxy"]
-	path = examples/simple-socks5-proxy
-	url = https://github.com/TuanKiri/simple-socks5-proxy
+	path = examples/socks5-server
+	url = https://github.com/TuanKiri/socks5-server.git
