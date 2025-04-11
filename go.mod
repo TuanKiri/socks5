@@ -1,6 +1,6 @@
 module github.com/TuanKiri/socks5
 
-go 1.22
+go 1.24.1
 
 require (
 	github.com/stretchr/testify v1.10.0
