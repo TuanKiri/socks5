@@ -3,7 +3,7 @@ module github.com/TuanKiri/socks5
 go 1.24.1
 
 require (
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.39.0
 	golang.org/x/sync v0.13.0
 )
